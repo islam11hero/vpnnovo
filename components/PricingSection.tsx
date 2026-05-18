@@ -5,6 +5,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
+  Crown,
   Loader2,
   AlertTriangle,
   KeyRound,
@@ -17,6 +18,11 @@ import {
 import { CopyButton } from "@/components/CopyButton";
 import { CheckoutToast } from "@/components/ui/checkout-toast";
 import { generateTrialDeviceHash } from "@/lib/trial-device-hash";
+import {
+  SOVEREIGN_ANNUAL_PRICE_USD,
+  SOVEREIGN_PLAN_NAME,
+  type BillingCycle,
+} from "@/lib/plan-pricing";
 
 type PaymentPending = {
   order_id: string;
@@ -24,6 +30,17 @@ type PaymentPending = {
 };
 
 type CheckoutPhase = "idle" | "processing";
+
+type PricingPlan = {
+  name: string;
+  price: number;
+  priceSuffix: string;
+  desc: string;
+  popular?: boolean;
+  sovereign?: boolean;
+  billing: BillingCycle;
+  features: string[];
+};
 
 type RegionId = "spain" | "germany" | "singapore";
 
@@ -48,7 +65,12 @@ const REGION_OPTIONS: {
   },
 ];
 
-export function PricingSection() {
+type PricingSectionProps = {
+  theme?: "light" | "dark";
+};
+
+export function PricingSection({ theme = "light" }: PricingSectionProps) {
+  const dark = theme === "dark";
   const [phase, setPhase] = useState<CheckoutPhase>("idle");
   const [activePlan, setActivePlan] = useState<string | null>(null);
   const [paymentPending, setPaymentPending] = useState<PaymentPending | null>(
@@ -63,18 +85,24 @@ export function PricingSection() {
 
   const isBusy = phase !== "idle" || isTrialLoading;
 
-  const handleCheckout = async (planName: string) => {
-    setActivePlan(planName);
+  const handleCheckout = async (plan: PricingPlan) => {
+    setActivePlan(plan.name);
     setPhase("processing");
     setErrorMsg(null);
+
+    const billing: BillingCycle = plan.sovereign
+      ? "sovereign"
+      : isAnnual
+        ? "annual"
+        : "monthly";
 
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          planName,
-          billing: isAnnual ? "annual" : "monthly",
+          planName: plan.name,
+          billing,
         }),
       });
       const data = (await res.json()) as {
@@ -145,25 +173,31 @@ export function PricingSection() {
     }
   };
 
-  const getButtonLabel = (planName: string) => {
-    if (activePlan !== planName) return "Get Started";
-    if (phase === "processing") return "Creating crypto invoice...";
+  const getButtonLabel = (plan: PricingPlan) => {
+    if (activePlan === plan.name && phase !== "idle") {
+      return plan.sovereign ? "Deploying sovereign node…" : "Creating crypto invoice...";
+    }
+    if (plan.sovereign) return "Deploy Sovereign Node";
     return "Get Started";
   };
 
-  const plans = [
+  const standardPlans: PricingPlan[] = [
     {
       name: "Standard",
       price: isAnnual ? 4.99 : 6.99,
+      priceSuffix: "/mo",
       desc: "Perfect for short trips.",
       popular: false,
+      billing: isAnnual ? "annual" : "monthly",
       features: ["Unlimited Data", "Standard Servers", "1 Device"],
     },
     {
       name: "Pro Shield",
       price: isAnnual ? 7.99 : 12.99,
+      priceSuffix: "/mo",
       desc: "Maximum value & privacy.",
       popular: true,
+      billing: isAnnual ? "annual" : "monthly",
       features: [
         "Automated Dashboard",
         "Zero-Buffering Tech",
@@ -172,6 +206,22 @@ export function PricingSection() {
       ],
     },
   ];
+
+  const sovereignPlan: PricingPlan = {
+    name: SOVEREIGN_PLAN_NAME,
+    price: SOVEREIGN_ANNUAL_PRICE_USD,
+    priceSuffix: "/year",
+    desc: "Absolute anonymity for privacy whales & OPSEC professionals.",
+    sovereign: true,
+    billing: "sovereign",
+    features: [
+      "Dedicated Clean IP (Zero-Captcha & Bank Safe)",
+      "Multi-Hop Routing (Double Cascading VPN)",
+      "Military-Grade OPSEC (100% RAM-Only Nodes)",
+      "Monero (XMR) Untraceable Payments Only",
+      "Zero-Knowledge Ghost Accounts (No Email)",
+    ],
+  };
 
   return (
     <>
@@ -235,15 +285,20 @@ export function PricingSection() {
       ) : null}
     </AnimatePresence>
 
-    <section id="pricing" className="min-h-[500px] bg-slate-50 px-6 py-24">
+    <section
+      id="pricing"
+      className={`min-h-[500px] px-6 py-24 ${dark ? "bg-slate-950" : "bg-slate-50"}`}
+    >
       <div className="mx-auto max-w-6xl">
         <div className="mb-16 text-center">
-          <h2 className="mb-6 font-poppins text-3xl font-bold md:text-5xl">
+          <h2
+            className={`mb-6 font-poppins text-3xl font-bold md:text-5xl ${dark ? "text-white" : "text-slate-900"}`}
+          >
             Choose Your Shield.
           </h2>
           <div className="flex items-center justify-center gap-4">
             <span
-              className={`font-bold ${!isAnnual ? "text-slate-900" : "text-slate-400"}`}
+              className={`font-bold ${!isAnnual ? (dark ? "text-white" : "text-slate-900") : "text-slate-400"}`}
             >
               Monthly
             </span>
@@ -259,7 +314,7 @@ export function PricingSection() {
               />
             </button>
             <span
-              className={`flex items-center gap-2 font-bold ${isAnnual ? "text-slate-900" : "text-slate-400"}`}
+              className={`flex items-center gap-2 font-bold ${isAnnual ? (dark ? "text-white" : "text-slate-900") : "text-slate-400"}`}
             >
               Annually{" "}
               <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
@@ -414,56 +469,143 @@ export function PricingSection() {
             </button>
           </div>
         ) : (
-          <div className="mx-auto grid max-w-4xl gap-8 md:grid-cols-2">
-            {plans.map((plan) => (
-              <div
-                key={plan.name}
-                className={`relative rounded-[2.5rem] bg-white p-10 transition-transform ${
-                  plan.popular
-                    ? "z-10 border-2 border-[#3B82F6] shadow-2xl shadow-blue-500/10 md:scale-105"
-                    : "border border-slate-100 shadow-lg hover:-translate-y-1"
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-[#3B82F6] px-4 py-1.5 text-xs font-bold tracking-widest text-white uppercase shadow-md">
-                    Most Popular
-                  </div>
-                )}
-                <h3 className="mb-2 font-poppins text-2xl font-bold text-slate-900">
-                  {plan.name}
-                </h3>
-                <p className="mb-6 h-5 text-sm font-medium text-slate-500">
-                  {plan.desc}
-                </p>
-                <div className="mb-8 font-poppins text-5xl font-black text-slate-900">
-                  ${plan.price}
-                  <span className="text-lg font-medium text-slate-400">/mo</span>
-                </div>
-                <ul className="mb-8 space-y-4 text-sm font-bold text-slate-600">
-                  {plan.features.map((feat) => (
-                    <li key={feat} className="flex items-center gap-3">
-                      <CheckCircle2 className="h-5 w-5 text-[#3B82F6]" />
-                      {feat}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  onClick={() => handleCheckout(plan.name)}
-                  disabled={isBusy}
-                  className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 font-bold transition-all disabled:cursor-not-allowed disabled:opacity-70 ${
-                    plan.popular
-                      ? "bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30 hover:bg-blue-600"
-                      : "border border-slate-200 bg-slate-50 text-slate-900 hover:bg-slate-100"
+          <div className="mx-auto max-w-6xl space-y-10">
+            <motion.div className="grid gap-8 md:grid-cols-2">
+              {standardPlans.map((plan) => (
+                <motion.div
+                  key={plan.name}
+                  className={`relative rounded-[2.5rem] p-10 transition-transform ${
+                    dark
+                      ? plan.popular
+                        ? "z-10 border-2 border-cyan-500/60 bg-slate-900/90 shadow-2xl shadow-cyan-500/10 md:scale-[1.02]"
+                        : "border border-slate-700 bg-slate-900/60 shadow-lg hover:-translate-y-1"
+                      : plan.popular
+                        ? "z-10 border-2 border-[#3B82F6] bg-white shadow-2xl shadow-blue-500/10 md:scale-[1.02]"
+                        : "border border-slate-100 bg-white shadow-lg hover:-translate-y-1"
                   }`}
                 >
-                  {activePlan === plan.name && phase !== "idle" ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
+                  {plan.popular ? (
+                    <motion.div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-[#3B82F6] px-4 py-1.5 text-xs font-bold tracking-widest text-white uppercase shadow-md">
+                      Most Popular
+                    </motion.div>
                   ) : null}
-                  {getButtonLabel(plan.name)}
-                </button>
-              </div>
-            ))}
+                  <h3
+                    className={`mb-2 font-poppins text-2xl font-bold ${dark ? "text-white" : "text-slate-900"}`}
+                  >
+                    {plan.name}
+                  </h3>
+                  <p
+                    className={`mb-6 min-h-[2.5rem] text-sm font-medium ${dark ? "text-slate-400" : "text-slate-500"}`}
+                  >
+                    {plan.desc}
+                  </p>
+                  <div
+                    className={`mb-8 font-poppins text-5xl font-black ${dark ? "text-white" : "text-slate-900"}`}
+                  >
+                    ${plan.price}
+                    <span className="text-lg font-medium text-slate-400">
+                      {plan.priceSuffix}
+                    </span>
+                  </div>
+                  <ul
+                    className={`mb-8 space-y-4 text-sm font-bold ${dark ? "text-slate-300" : "text-slate-600"}`}
+                  >
+                    {plan.features.map((feat) => (
+                      <li key={feat} className="flex items-start gap-3">
+                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#3B82F6]" />
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => void handleCheckout(plan)}
+                    disabled={isBusy}
+                    className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 font-bold transition-all disabled:cursor-not-allowed disabled:opacity-70 ${
+                      plan.popular
+                        ? "bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30 hover:bg-blue-600"
+                        : "border border-slate-200 bg-slate-50 text-slate-900 hover:bg-slate-100"
+                    }`}
+                  >
+                    {activePlan === plan.name && phase !== "idle" ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : null}
+                    {getButtonLabel(plan)}
+                  </button>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="relative overflow-hidden rounded-[2.5rem] border-2 border-amber-500/50 bg-gradient-to-br from-zinc-950 via-black to-zinc-900 p-10 shadow-2xl shadow-amber-900/20 md:p-12"
+            >
+              <motion.div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-red-600/20 blur-3xl" />
+              <motion.div
+                className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-amber-500/15 blur-3xl"
+                animate={{ opacity: [0.2, 0.45, 0.2] }}
+                transition={{ duration: 4, repeat: Infinity }}
+              />
+
+              <motion.div className="relative flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between">
+                <motion.div className="max-w-xl">
+                  <motion.div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-950/60 px-4 py-1.5 text-xs font-black tracking-[0.2em] text-amber-300 uppercase">
+                    <Crown className="h-3.5 w-3.5" />
+                    FOR PARANOID PROFESSIONALS
+                  </motion.div>
+                  <h3 className="font-poppins text-3xl font-black tracking-tight text-white md:text-4xl">
+                    {sovereignPlan.name}
+                  </h3>
+                  <p className="mt-3 text-sm font-medium leading-relaxed text-zinc-400">
+                    {sovereignPlan.desc}
+                  </p>
+                  <motion.div className="mt-8 flex items-baseline gap-2">
+                    <span className="font-poppins text-6xl font-black text-transparent bg-gradient-to-r from-amber-200 via-amber-400 to-red-400 bg-clip-text">
+                      ${sovereignPlan.price}
+                    </span>
+                    <span className="text-lg font-bold text-amber-500/80">/ year</span>
+                  </motion.div>
+                  <p className="mt-2 text-xs font-bold tracking-wider text-red-400/90 uppercase">
+                    XMR-only · Ghost identity · No email required
+                  </p>
+                </motion.div>
+
+                <motion.div className="w-full max-w-md lg:pt-8">
+                  <ul className="mb-8 space-y-4">
+                    {sovereignPlan.features.map((feat) => (
+                      <li
+                        key={feat}
+                        className="flex items-start gap-3 rounded-xl border border-red-900/40 bg-black/40 px-4 py-3 text-sm font-semibold text-zinc-200"
+                      >
+                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => void handleCheckout(sovereignPlan)}
+                    disabled={isBusy}
+                    className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl border-2 border-amber-500/60 bg-gradient-to-r from-red-700 via-amber-700 to-red-800 px-6 py-5 text-base font-black tracking-wide text-white shadow-lg shadow-red-900/50 transition hover:border-amber-400 hover:shadow-amber-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <motion.span
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent"
+                      animate={{ x: ["-100%", "100%"] }}
+                      transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
+                    />
+                    {activePlan === sovereignPlan.name && phase !== "idle" ? (
+                      <Loader2 className="relative h-5 w-5 animate-spin" />
+                    ) : (
+                      <Crown className="relative h-5 w-5" />
+                    )}
+                    <span className="relative">{getButtonLabel(sovereignPlan)}</span>
+                  </button>
+                </motion.div>
+              </motion.div>
+            </motion.div>
           </div>
         )}
 

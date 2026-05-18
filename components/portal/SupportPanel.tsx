@@ -1,76 +1,72 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Headphones, Loader2, MessageSquare, Shield } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useState, useTransition } from "react";
+import { Headphones, Loader2, MessageSquare, Server, Shield } from "lucide-react";
+import { toast } from "sonner";
 
+import {
+  createSupportTicket,
+  getTicketsForOrder,
+} from "@/actions/tickets";
+import type { PortalOrderOption } from "@/lib/orders";
 import { TICKET_SUBJECTS, type SupportTicket } from "@/lib/tickets";
 
 type Props = {
-  orderId: string;
+  activeOrders: PortalOrderOption[];
+  defaultOrderId: string;
 };
 
-export function SupportPanel({ orderId }: Props) {
+export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
+  const [selectedOrderId, setSelectedOrderId] = useState(defaultOrderId);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [subject, setSubject] = useState<string>(TICKET_SUBJECTS[0]);
   const [message, setMessage] = useState("");
+  const [isPending, startTransition] = useTransition();
 
-  const loadTickets = useCallback(async () => {
+  const loadTickets = useCallback(async (orderId: string) => {
     setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/tickets?order_id=${encodeURIComponent(orderId)}`,
-        { cache: "no-store" },
-      );
-      const data = (await res.json()) as {
-        success?: boolean;
-        tickets?: SupportTicket[];
-        error?: string;
-      };
-      if (!res.ok || !data.success) {
-        throw new Error(data.error ?? "Failed to load tickets");
-      }
-      setTickets(data.tickets ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load tickets");
-    } finally {
-      setLoading(false);
+    const result = await getTicketsForOrder(orderId);
+    if (!result.success) {
+      toast.error(result.error);
+      setTickets([]);
+    } else {
+      setTickets(result.data?.tickets ?? []);
     }
-  }, [orderId]);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    void loadTickets();
-  }, [loadTickets]);
+    void loadTickets(selectedOrderId);
+  }, [selectedOrderId, loadTickets]);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
 
-    try {
-      const res = await fetch("/api/tickets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: orderId, subject, message }),
-      });
-      const data = (await res.json()) as { success?: boolean; error?: string };
-      if (!res.ok || !data.success) {
-        throw new Error(data.error ?? "Failed to submit ticket");
-      }
-      setMessage("");
-      setSuccess("Ticket submitted. Our team will reply here — no email required.");
-      await loadTickets();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Submission failed");
-    } finally {
-      setSubmitting(false);
+    if (!selectedOrderId) {
+      toast.error("Select an active VPN node before submitting.");
+      return;
     }
+
+    startTransition(async () => {
+      const result = await createSupportTicket({
+        order_id: selectedOrderId,
+        subject,
+        message,
+      });
+
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Ticket submitted — our team will reply in this thread.");
+      setMessage("");
+      await loadTickets(selectedOrderId);
+    });
   };
+
+  const hasMultipleNodes = activeOrders.length > 1;
 
   return (
     <div className="space-y-6">
@@ -84,8 +80,8 @@ export function SupportPanel({ orderId }: Props) {
               Zero-Knowledge Support
             </h3>
             <p className="mt-1 text-sm font-medium text-slate-600">
-              100% Anonymous. No email needed. We only see your Order ID and
-              technical context — never your real identity.
+              No email required. Pick the VPN node you need help with — we only
+              see your Order ID and technical context.
             </p>
           </div>
         </div>
@@ -101,6 +97,29 @@ export function SupportPanel({ orderId }: Props) {
             Create New Ticket
           </h3>
         </div>
+
+        <label className="mb-2 flex items-center gap-2 text-xs font-bold tracking-wider text-slate-500 uppercase">
+          <Server className="h-3.5 w-3.5" />
+          Active VPN node (required)
+        </label>
+        {hasMultipleNodes ? (
+          <select
+            value={selectedOrderId}
+            onChange={(e) => setSelectedOrderId(e.target.value)}
+            required
+            className="mb-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 focus:border-[#3B82F6]/50 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20"
+          >
+            {activeOrders.map((node) => (
+              <option key={node.id} value={node.id}>
+                {node.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-sm font-bold text-slate-800">
+            {activeOrders[0]?.label ?? defaultOrderId}
+          </div>
+        )}
 
         <label className="mb-2 block text-xs font-bold tracking-wider text-slate-500 uppercase">
           Subject
@@ -130,19 +149,12 @@ export function SupportPanel({ orderId }: Props) {
           className="mb-4 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#3B82F6]/50 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20"
         />
 
-        {error ? (
-          <p className="mb-3 text-sm font-bold text-red-600">{error}</p>
-        ) : null}
-        {success ? (
-          <p className="mb-3 text-sm font-bold text-emerald-600">{success}</p>
-        ) : null}
-
         <button
           type="submit"
-          disabled={submitting}
+          disabled={isPending || !selectedOrderId}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3B82F6] py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Submit Anonymous Ticket
         </button>
       </form>
@@ -153,6 +165,11 @@ export function SupportPanel({ orderId }: Props) {
           <h3 className="font-poppins text-lg font-bold text-slate-900">
             Your Tickets
           </h3>
+          {hasMultipleNodes ? (
+            <span className="ml-auto text-xs font-medium text-slate-400">
+              Node: {selectedOrderId.slice(0, 8)}…
+            </span>
+          ) : null}
         </div>
 
         {loading ? (
@@ -161,20 +178,20 @@ export function SupportPanel({ orderId }: Props) {
           </div>
         ) : tickets.length === 0 ? (
           <p className="text-sm font-medium text-slate-500">
-            No tickets yet. Open one above if you need help.
+            No tickets for this node yet. Open one above if you need help.
           </p>
         ) : (
-          <ul className="space-y-4">
+          <ul className="space-y-6">
             {tickets.map((ticket) => (
               <li
                 key={ticket.id}
-                className="rounded-xl border border-slate-100 bg-slate-50/80 p-5"
+                className="rounded-xl border border-slate-100 bg-slate-50/50 p-5"
               >
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                   <p className="font-bold text-slate-900">{ticket.subject}</p>
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${
-                      ticket.status === "resolved"
+                      ticket.status === "closed" || ticket.status === "resolved"
                         ? "bg-emerald-100 text-emerald-700"
                         : "bg-amber-100 text-amber-800"
                     }`}
@@ -182,20 +199,44 @@ export function SupportPanel({ orderId }: Props) {
                     {ticket.status}
                   </span>
                 </div>
-                <p className="text-sm font-medium text-slate-600">{ticket.message}</p>
-                <p className="mt-2 text-xs text-slate-400">
-                  {new Date(ticket.created_at).toLocaleString()}
-                </p>
-                {ticket.admin_reply ? (
-                  <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/90 p-4">
-                    <p className="mb-1 text-xs font-bold tracking-wider text-emerald-800 uppercase">
-                      Message from Admin
-                    </p>
-                    <p className="text-sm font-medium text-emerald-950">
-                      {ticket.admin_reply}
-                    </p>
+
+                <div className="space-y-3">
+                  <div className="flex justify-end">
+                    <div className="max-w-[92%] rounded-2xl rounded-br-md bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200/80">
+                      <p className="mb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                        You
+                      </p>
+                      <p className="text-sm font-medium text-slate-700">
+                        {ticket.message}
+                      </p>
+                      <p className="mt-2 text-right text-[10px] text-slate-400">
+                        {new Date(ticket.created_at).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                ) : null}
+
+                  {ticket.admin_reply ? (
+                    <div className="flex justify-start">
+                      <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-white px-4 py-3 shadow-sm">
+                        <p className="mb-1 text-[10px] font-bold tracking-wider text-emerald-700 uppercase">
+                          NovaVPN Support
+                        </p>
+                        <p className="text-sm font-medium text-emerald-950">
+                          {ticket.admin_reply}
+                        </p>
+                        {ticket.updated_at ? (
+                          <p className="mt-2 text-[10px] text-emerald-600/80">
+                            {new Date(ticket.updated_at).toLocaleString()}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-center text-xs font-medium text-slate-400">
+                      Awaiting engineer response…
+                    </p>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

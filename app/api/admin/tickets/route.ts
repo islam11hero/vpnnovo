@@ -121,7 +121,7 @@ export async function PATCH(request: Request) {
     "status" in body &&
     typeof (body as { status: unknown }).status === "string"
       ? (body as { status: string }).status
-      : "resolved";
+      : "closed";
 
   if (!ticket_id) {
     return jsonError("Invalid or missing ticket_id", 400);

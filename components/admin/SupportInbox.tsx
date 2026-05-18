@@ -1,182 +1,219 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Headphones, Loader2, Send } from "lucide-react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { Headphones, Loader2, MessageSquare, Send } from "lucide-react";
+import { toast } from "sonner";
 
+import {
+  getAllSupportTickets,
+  replyToSupportTicket,
+} from "@/actions/tickets";
+import { ApiOfflineBadge } from "@/components/admin/noc/api-offline-badge";
+import { NocEmptyState } from "@/components/admin/noc/noc-empty-state";
+import { Sheet } from "@/components/ui/sheet";
 import type { SupportTicketWithOrder } from "@/lib/tickets";
 
 export function SupportInbox() {
   const [tickets, setTickets] = useState<SupportTicketWithOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
-  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [apiOffline, setApiOffline] = useState(false);
+  const [activeTicket, setActiveTicket] = useState<SupportTicketWithOrder | null>(
+    null,
+  );
+  const [replyDraft, setReplyDraft] = useState("");
+  const [isPending, startTransition] = useTransition();
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/tickets", { cache: "no-store" });
-      const data = (await res.json()) as {
-        success?: boolean;
-        tickets?: SupportTicketWithOrder[];
-        error?: string;
-      };
-      if (!res.ok || !data.success) {
-        throw new Error(data.error ?? "Failed to load tickets");
-      }
-      setTickets(data.tickets ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load inbox");
-    } finally {
-      setLoading(false);
+    const result = await getAllSupportTickets();
+    if (!result.success) {
+      console.error("[support-inbox]", result.error);
+      setApiOffline(true);
+      setTickets([]);
+      toast.error("API Offline", { description: result.error });
+    } else {
+      setApiOffline(false);
+      setTickets(result.data?.tickets ?? []);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
 
-  const handleReply = async (ticketId: string) => {
-    const admin_reply = replyDrafts[ticketId]?.trim() ?? "";
-    if (!admin_reply) return;
+  const openReply = (ticket: SupportTicketWithOrder) => {
+    setActiveTicket(ticket);
+    setReplyDraft(ticket.admin_reply ?? "");
+  };
 
-    setSubmittingId(ticketId);
-    try {
-      const res = await fetch("/api/admin/tickets", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ticket_id: ticketId,
-          admin_reply,
-          status: "resolved",
-        }),
-      });
-      const data = (await res.json()) as { success?: boolean; error?: string };
-      if (!res.ok || !data.success) {
-        throw new Error(data.error ?? "Failed to send reply");
-      }
-      setReplyDrafts((prev) => ({ ...prev, [ticketId]: "" }));
-      await loadTickets();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Reply failed");
-    } finally {
-      setSubmittingId(null);
+  const closeReply = () => {
+    if (isPending) return;
+    setActiveTicket(null);
+    setReplyDraft("");
+  };
+
+  const submitReply = () => {
+    if (!activeTicket) return;
+    const admin_reply = replyDraft.trim();
+    if (admin_reply.length < 3) {
+      toast.error("Reply must be at least 3 characters.");
+      return;
     }
+
+    const ticketId = activeTicket.id;
+
+    startTransition(async () => {
+      const result = await replyToSupportTicket({
+        ticket_id: ticketId,
+        admin_reply,
+      });
+
+      if (!result.success) {
+        toast.error("API Offline", { description: result.error });
+        return;
+      }
+
+      toast.success("Reply delivered", {
+        description: "Ticket closed · client portal updated.",
+      });
+      closeReply();
+      await loadTickets();
+    });
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center rounded-3xl border border-slate-200/60 bg-white/90 py-24 backdrop-blur-sm">
-        <Loader2 className="h-10 w-10 animate-spin text-[#3B82F6]" />
+      <div className="flex justify-center py-24">
+        <Loader2 className="h-10 w-10 animate-spin text-cyan-500" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-700">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="overflow-hidden rounded-3xl border border-slate-200/60 bg-white/90 shadow-sm backdrop-blur-sm">
-        <div className="border-b border-slate-200/60 bg-slate-50/80 p-6">
+    <>
+      <div className="space-y-4 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
           <div className="flex items-center gap-3">
-            <Headphones className="h-6 w-6 text-[#3B82F6]" />
+            <Headphones className="h-6 w-6 text-cyan-400" />
             <div>
-              <h2 className="text-lg font-bold text-slate-800">Support Inbox</h2>
-              <p className="text-sm text-slate-500">
-                Zero-knowledge tickets — technical context only, no client PII.
+              <h2 className="text-lg font-bold text-white">Support Hub</h2>
+              <p className="text-xs text-slate-500">
+                Supabase tickets · orders join
               </p>
             </div>
           </div>
+          {apiOffline ? <ApiOfflineBadge label="Supabase Offline" /> : null}
         </div>
 
         {tickets.length === 0 ? (
-          <p className="p-12 text-center text-sm font-medium text-slate-500">
-            No support tickets yet.
-          </p>
+          <NocEmptyState
+            icon={MessageSquare}
+            title="Awaiting First Deployment"
+            description="Support tickets appear when clients open cases from the portal. Inbox is clear at pre-launch."
+          />
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-slate-800">
             {tickets.map((ticket) => (
-              <li key={ticket.id} className="p-6">
-                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-bold text-slate-900">{ticket.subject}</p>
-                    <p className="mt-1 text-xs font-medium text-slate-500">
-                      {new Date(ticket.created_at).toLocaleString()} · Order{" "}
-                      <span className="font-mono">{ticket.order_id.slice(0, 8)}…</span>
-                    </p>
-                  </div>
+              <li
+                key={ticket.id}
+                className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold text-white">{ticket.subject}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {new Date(ticket.created_at).toLocaleString()} ·{" "}
+                    <span className="font-mono text-cyan-400/80">
+                      {ticket.order_id}
+                    </span>
+                  </p>
+                  <p className="mt-2 line-clamp-2 text-sm text-slate-400">
+                    {ticket.message}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${
-                      ticket.status === "resolved"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-amber-100 text-amber-800"
+                    className={`rounded-md px-2.5 py-1 text-[10px] font-bold uppercase ${
+                      ticket.status === "closed" || ticket.status === "resolved"
+                        ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                        : "border border-amber-500/40 bg-amber-500/10 text-amber-400"
                     }`}
                   >
                     {ticket.status}
                   </span>
-                </div>
-
-                <div className="mb-4 flex flex-wrap gap-2">
-                  <span className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800">
-                    {ticket.vpn_username ?? "No VPN user"}
-                  </span>
-                  <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700">
-                    {ticket.plan_name ?? "Unknown plan"}
-                  </span>
-                </div>
-
-                <p className="rounded-xl bg-slate-50 p-4 text-sm font-medium text-slate-700">
-                  {ticket.message}
-                </p>
-
-                {ticket.admin_reply ? (
-                  <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/80 p-4">
-                    <p className="text-xs font-bold text-emerald-800 uppercase">
-                      Your reply
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-emerald-950">
-                      {ticket.admin_reply}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-4 space-y-3">
-                    <textarea
-                      value={replyDrafts[ticket.id] ?? ""}
-                      onChange={(e) =>
-                        setReplyDrafts((prev) => ({
-                          ...prev,
-                          [ticket.id]: e.target.value,
-                        }))
-                      }
-                      rows={3}
-                      placeholder="Type your technical reply…"
-                      className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium focus:border-[#3B82F6]/50 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20"
-                    />
+                  {ticket.admin_reply ? (
+                    <span className="text-[10px] font-medium text-slate-600">
+                      Replied
+                    </span>
+                  ) : (
                     <button
                       type="button"
-                      disabled={submittingId === ticket.id}
-                      onClick={() => void handleReply(ticket.id)}
-                      className="inline-flex items-center gap-2 rounded-xl bg-[#3B82F6] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-blue-600 disabled:opacity-60"
+                      onClick={() => openReply(ticket)}
+                      className="rounded-lg border border-cyan-500/40 bg-cyan-600/20 px-4 py-2 text-xs font-bold text-cyan-100 hover:bg-cyan-600/30"
                     >
-                      {submittingId === ticket.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                      Send Reply &amp; Resolve
+                      Reply
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </li>
             ))}
           </ul>
         )}
       </div>
-    </div>
+
+      <Sheet
+        open={Boolean(activeTicket)}
+        onClose={closeReply}
+        title={activeTicket?.subject ?? "Reply"}
+        description={
+          activeTicket
+            ? `Order ${activeTicket.order_id} · ${activeTicket.vpn_username ?? "—"}`
+            : undefined
+        }
+      >
+        {activeTicket ? (
+          <div className="space-y-5">
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+              <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">
+                Client message
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                {activeTicket.message}
+              </p>
+            </div>
+            <div>
+              <label
+                htmlFor="admin-reply"
+                className="text-[10px] font-bold tracking-widest text-slate-500 uppercase"
+              >
+                Admin reply
+              </label>
+              <textarea
+                id="admin-reply"
+                value={replyDraft}
+                onChange={(e) => setReplyDraft(e.target.value)}
+                rows={8}
+                disabled={isPending}
+                placeholder="Technical resolution for the client portal…"
+                className="mt-2 w-full resize-none rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-200 placeholder:text-slate-600 focus:border-cyan-500/50 focus:outline-none disabled:opacity-50"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={submitReply}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-600 py-3 text-sm font-bold text-white hover:bg-cyan-500 disabled:opacity-50"
+            >
+              {isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Send Reply &amp; Close Ticket
+            </button>
+          </div>
+        ) : null}
+      </Sheet>
+    </>
   );
 }

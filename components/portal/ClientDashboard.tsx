@@ -14,7 +14,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { ProtocolExportHub } from "@/components/portal/ProtocolExportHub";
 import { ExpiryCalendarButton } from "@/components/portal/ExpiryCalendarButton";
 import { LiveNetworkStatus } from "@/components/portal/LiveNetworkStatus";
 import { PanicRevokeButton } from "@/components/portal/PanicRevokeButton";
@@ -23,13 +22,21 @@ import { DownloadRecoveryKey } from "@/components/portal/DownloadRecoveryKey";
 import { IntegrationGuides } from "@/components/portal/IntegrationGuides";
 import { RenewSubscriptionButton } from "@/components/portal/RenewSubscriptionButton";
 import { SecurityLab } from "@/components/portal/SecurityLab";
-import type { MarzbanUserStats } from "@/lib/marzban";
+import { DeepFingerprintAuditor } from "@/components/portal/opsec/DeepFingerprintAuditor";
+import { DNSAndIPv6Auditor } from "@/components/portal/opsec/DNSAndIPv6Auditor";
+import { IPTrustScanner } from "@/components/portal/opsec/IPTrustScanner";
+import { SmartExportHub } from "@/components/portal/opsec/SmartExportHub";
+import { TimezoneAuditor } from "@/components/portal/opsec/TimezoneAuditor";
+import { WebRTCLeakShield } from "@/components/portal/opsec/WebRTCLeakShield";
+import { ZeroTraceWipeButton } from "@/components/portal/opsec/ZeroTraceWipeButton";
+import type { MarzbanUserStats } from "@/lib/marzban-types";
 import { formatTraffic } from "@/lib/marzban-users";
 import {
   formatPortalCurrency,
   formatPortalExpiry,
   usagePercent,
 } from "@/lib/portal-format";
+import type { PortalOrderOption } from "@/lib/orders";
 import type { SupabaseOrder } from "@/lib/supabase/types";
 
 type TabId =
@@ -43,6 +50,7 @@ type TabId =
 type Props = {
   order: SupabaseOrder;
   marzbanUser: MarzbanUserStats | null;
+  activeOrders: PortalOrderOption[];
 };
 
 const TABS: {
@@ -50,7 +58,7 @@ const TABS: {
   label: string;
   icon: typeof BarChart3;
 }[] = [
-  { id: "overview", label: "Overview", icon: BarChart3 },
+  { id: "overview", label: "OPSEC Vault", icon: Shield },
   { id: "connection", label: "Connection", icon: KeyRound },
   { id: "developer", label: "Developer Hub", icon: Code2 },
   { id: "billing", label: "Billing & Security", icon: ShieldCheck },
@@ -78,7 +86,7 @@ function NavButton({
         type="button"
         onClick={() => onSelect(tab.id)}
         className={`flex flex-1 flex-col items-center gap-1 px-1 py-2 transition-colors ${
-          isActive ? "text-[#3B82F6]" : "text-slate-400"
+          isActive ? "text-cyan-400" : "text-slate-500"
         }`}
         aria-current={isActive ? "page" : undefined}
       >
@@ -96,8 +104,8 @@ function NavButton({
       onClick={() => onSelect(tab.id)}
       className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-bold transition-all ${
         isActive
-          ? "bg-[#3B82F6] text-white shadow-md shadow-blue-500/20"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          ? "bg-gradient-to-r from-cyan-600 to-violet-600 text-white shadow-lg shadow-cyan-500/20"
+          : "text-slate-400 hover:bg-slate-800/80 hover:text-white"
       }`}
       aria-current={isActive ? "page" : undefined}
     >
@@ -107,7 +115,7 @@ function NavButton({
   );
 }
 
-export function ClientDashboard({ order, marzbanUser }: Props) {
+export function ClientDashboard({ order, marzbanUser, activeOrders }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [liveSubLink, setLiveSubLink] = useState(order.vpn_sub_link ?? "");
 
@@ -131,12 +139,12 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col lg:flex-row">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white px-4 py-8 lg:block lg:rounded-l-2xl lg:border lg:border-r-0 lg:shadow-sm">
+      <aside className="hidden w-64 shrink-0 border-r border-slate-800 bg-slate-950/90 px-4 py-8 lg:block lg:rounded-l-2xl lg:border lg:border-r-0">
         <div className="mb-8 px-2">
-          <p className="text-xs font-bold tracking-wider text-slate-400 uppercase">
-            Client Dashboard
+          <p className="text-xs font-bold tracking-[0.2em] text-cyan-500/80 uppercase">
+            OPSEC Security Vault
           </p>
-          <h1 className="mt-1 font-poppins text-lg font-bold text-slate-900">
+          <h1 className="mt-1 font-poppins text-lg font-bold text-white">
             {order.vpn_username ?? "Your Shield"}
           </h1>
           <p className="mt-1 truncate text-xs font-medium text-slate-500">
@@ -157,23 +165,23 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
       </aside>
 
       {/* Main content */}
-      <div className="flex min-w-0 flex-1 flex-col bg-slate-50 lg:rounded-r-2xl lg:border lg:border-l-0 lg:shadow-sm">
+      <div className="flex min-w-0 flex-1 flex-col bg-slate-950 lg:rounded-r-2xl lg:border lg:border-l-0 lg:border-slate-800">
         {/* Mobile header */}
-        <div className="border-b border-slate-200 bg-white px-5 py-5 lg:hidden">
+        <div className="border-b border-slate-800 bg-slate-950/95 px-5 py-5 lg:hidden">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-bold tracking-wider text-emerald-600 uppercase">
-                Shield active
+              <p className="text-xs font-bold tracking-[0.2em] text-cyan-500 uppercase">
+                OPSEC Vault
               </p>
-              <h1 className="font-poppins text-xl font-bold text-slate-900">
+              <h1 className="font-poppins text-xl font-bold text-white">
                 {order.vpn_username ?? "Your Shield"}
               </h1>
             </div>
             <span
               className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
                 isActive
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-slate-200 text-slate-600"
+                  ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                  : "border border-slate-700 bg-slate-800 text-slate-400"
               }`}
             >
               {statusLabel}
@@ -184,27 +192,34 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
         <div className="flex-1 overflow-y-auto p-5 pb-28 lg:p-8 lg:pb-8">
           {/* Desktop tab title */}
           <div className="mb-6 hidden lg:block">
-            <h2 className="font-poppins text-2xl font-bold text-slate-900">
+            <h2 className="font-poppins text-2xl font-bold text-white">
               {TABS.find((t) => t.id === activeTab)?.label}
             </h2>
             <p className="mt-1 text-sm font-medium text-slate-500">
-              Live data synced from Marzban · Spanish egress
+              Live Marzban telemetry · Privacy Whale OPSEC layer
             </p>
           </div>
 
           {activeTab === "overview" && (
             <div className="space-y-6">
-              <div className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/80 to-white p-6 shadow-sm">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <TimezoneAuditor />
+                <WebRTCLeakShield />
+                <IPTrustScanner />
+                <DNSAndIPv6Auditor />
+                <DeepFingerprintAuditor />
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-6 backdrop-blur-md">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100">
-                      <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10">
+                      <CheckCircle2 className="h-8 w-8 text-emerald-400" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-emerald-700 uppercase">
-                        Shield provisioned
+                      <p className="text-sm font-bold text-emerald-400 uppercase">
+                        Active subscription
                       </p>
-                      <p className="font-poppins text-xl font-bold text-slate-900">
+                      <p className="font-poppins text-xl font-bold text-white">
                         {order.vpn_username ?? "Ready"}
                       </p>
                     </div>
@@ -212,33 +227,40 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
                   <span
                     className={`rounded-full px-4 py-1.5 text-sm font-bold ${
                       isActive
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-200 text-slate-600"
+                        ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                        : "border border-slate-700 bg-slate-800 text-slate-400"
                     }`}
                   >
                     Status: {statusLabel}
                   </span>
                 </div>
+                <div className="mt-6">
+                  <ZeroTraceWipeButton
+                    orderId={order.id}
+                    disabled={!order.vpn_username || !subLink}
+                    onWiped={setLiveSubLink}
+                  />
+                </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-6 backdrop-blur-md md:p-8">
                 <div className="mb-5 flex items-center gap-2">
-                  <HardDrive className="h-5 w-5 text-[#3B82F6]" />
-                  <h3 className="font-poppins text-lg font-bold text-slate-900">
+                  <HardDrive className="h-5 w-5 text-cyan-400" />
+                  <h3 className="font-poppins text-lg font-bold text-white">
                     Data usage
                   </h3>
                 </div>
                 {marzbanUser ? (
                   <>
-                    <div className="mb-2 flex justify-between text-sm font-bold text-slate-700">
+                    <div className="mb-2 flex justify-between text-sm font-bold text-slate-300">
                       <span>{formatTraffic(used)} used</span>
-                      <span className="text-slate-400">
+                      <span className="text-slate-500">
                         {limit > 0 ? formatTraffic(limit) : "Unlimited"}
                       </span>
                     </div>
-                    <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-3 overflow-hidden rounded-full bg-slate-800">
                       <div
-                        className="h-full rounded-full bg-[#3B82F6] transition-all duration-500"
+                        className="h-full rounded-full bg-cyan-500 transition-all duration-500"
                         style={{
                           width: limit > 0 ? `${pct}%` : used > 0 ? "8%" : "0%",
                         }}
@@ -246,8 +268,8 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
                     </div>
                     {expiryLabel ? (
                       <div className="mt-5">
-                        <p className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                          <Calendar className="h-4 w-4 text-slate-400" />
+                        <p className="flex items-center gap-2 text-sm font-medium text-slate-400">
+                          <Calendar className="h-4 w-4 text-slate-500" />
                           Expires {expiryLabel}
                         </p>
                         <ExpiryCalendarButton
@@ -275,28 +297,30 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
           {activeTab === "connection" && (
             <div className="space-y-6">
               {subLink ? (
-                <ProtocolExportHub vpnSubLink={subLink} />
+                <SmartExportHub
+                  vpnSubLink={subLink}
+                  vpnUsername={order.vpn_username ?? order.marzban_username ?? ""}
+                />
               ) : (
-                <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-8 text-center backdrop-blur-md">
                   <p className="text-sm font-medium text-slate-500">
                     Subscription link is still provisioning. Check back shortly.
                   </p>
                 </div>
               )}
-
             </div>
           )}
 
           {activeTab === "developer" && (
             <div className="space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-6 backdrop-blur-md">
                 <p className="text-sm font-medium text-slate-600">
                   Integration guides for v2rayNG, AdsPower SOCKS5 routing, and
                   Python/Node scrapers. Import your subscription from the{" "}
                   <button
                     type="button"
                     onClick={() => setActiveTab("connection")}
-                    className="font-bold text-[#3B82F6] hover:underline"
+                    className="font-bold text-cyan-400 hover:underline"
                   >
                     Connection
                   </button>{" "}
@@ -307,7 +331,12 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
             </div>
           )}
 
-          {activeTab === "support" && <SupportPanel orderId={order.id} />}
+          {activeTab === "support" && (
+            <SupportPanel
+              activeOrders={activeOrders}
+              defaultOrderId={order.id}
+            />
+          )}
 
           {activeTab === "security" && (
             <SecurityLab
@@ -319,12 +348,12 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
 
           {activeTab === "billing" && (
             <div className="space-y-6">
-              <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:grid-cols-2 md:p-8">
+              <div className="grid gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-6 backdrop-blur-md sm:grid-cols-2 md:p-8">
                 <div>
                   <p className="text-xs font-bold tracking-wider text-slate-400 uppercase">
                     Plan
                   </p>
-                  <p className="mt-1 text-lg font-bold text-slate-900">
+                  <p className="mt-1 text-lg font-bold text-white">
                     {order.plan_name}
                   </p>
                 </div>
@@ -332,7 +361,7 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
                   <p className="text-xs font-bold tracking-wider text-slate-400 uppercase">
                     Amount paid
                   </p>
-                  <p className="mt-1 flex items-center gap-2 text-lg font-bold text-slate-900">
+                  <p className="mt-1 flex items-center gap-2 text-lg font-bold text-white">
                     <CreditCard className="h-4 w-4 text-slate-400" />
                     {isTrial ? "Free trial" : formatPortalCurrency(Number(order.amount))}
                   </p>
@@ -350,8 +379,8 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 className="mb-4 font-poppins text-lg font-bold text-slate-900">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-6 backdrop-blur-md">
+                <h3 className="mb-4 font-poppins text-lg font-bold text-white">
                   Account actions
                 </h3>
                 <div className="flex flex-col gap-4">
@@ -368,7 +397,7 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
                   ) : (
                     <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
                       Trial accounts cannot renew in-app. Upgrade from{" "}
-                      <a href="/#pricing" className="font-bold text-[#3B82F6] hover:underline">
+                      <a href="/#pricing" className="font-bold text-cyan-400 hover:underline">
                         pricing
                       </a>{" "}
                       when ready.
@@ -397,7 +426,7 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
 
         {/* Mobile bottom nav */}
         <nav
-          className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-slate-200 bg-white/95 px-2 py-1 backdrop-blur-lg lg:hidden"
+          className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-slate-800 bg-slate-950/95 px-2 py-1 backdrop-blur-lg lg:hidden"
           aria-label="Dashboard navigation"
         >
           {TABS.map((tab) => (

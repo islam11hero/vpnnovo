@@ -23,28 +23,30 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AdminSearchProvider>
-      <div className="flex h-screen bg-[#F8FAFC] font-sans text-slate-900">
+      <div className="flex h-screen bg-slate-950 font-sans text-slate-100">
         <AdminSidebar onLogout={handleLogout} />
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="z-10 flex h-20 shrink-0 items-center justify-between border-b border-slate-200/60 bg-white/80 px-6 shadow-sm backdrop-blur-xl md:px-8">
+          <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-950/95 px-6 backdrop-blur-xl md:px-8">
             <AdminHeaderSearch />
             <div className="flex items-center gap-5 md:ml-auto">
               <button
                 type="button"
-                className="relative text-slate-400 transition-colors hover:text-slate-600"
+                className="relative text-slate-500 transition-colors hover:text-cyan-400"
                 aria-label="Notifications"
               >
-                <Bell className="h-6 w-6" />
-                <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-0 right-0 h-2 w-2 rounded-full border border-slate-950 bg-emerald-500" />
               </button>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-gradient-to-tr from-[#3B82F6] to-purple-600 text-xs font-bold text-white shadow-sm">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-gradient-to-tr from-cyan-600 to-violet-600 text-[10px] font-black text-white">
                 CEO
               </div>
             </div>
           </header>
 
-          <main className="flex-1 overflow-y-auto p-6 md:p-8">{children}</main>
+          <main className="flex-1 overflow-y-auto bg-slate-950 p-6 md:p-8">
+            {children}
+          </main>
         </div>
       </div>
     </AdminSearchProvider>

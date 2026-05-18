@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 
 type HealthData = {
+  isSupabaseConfigured: boolean;
+  isMarzbanConfigured: boolean;
   marzban_online: boolean;
   site_url: string;
   admin_edge_auth: boolean;
@@ -76,6 +78,28 @@ export function SystemHealthPanel() {
           </div>
         </div>
 
+        <div className="mb-6 grid gap-3 sm:grid-cols-2">
+          <span
+            className={`rounded-xl border px-4 py-3 text-xs font-bold ${
+              data?.isSupabaseConfigured
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+          >
+            Supabase admin:{" "}
+            {data?.isSupabaseConfigured ? "Configured" : "Missing"}
+          </span>
+          <span
+            className={`rounded-xl border px-4 py-3 text-xs font-bold ${
+              data?.isMarzbanConfigured
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+          >
+            Marzban API: {data?.isMarzbanConfigured ? "Configured" : "Missing"}
+          </span>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6">
             <div className="mb-3 flex items-center gap-2">
@@ -84,7 +108,11 @@ export function SystemHealthPanel() {
                 Marzban API Connection
               </p>
             </div>
-            {data?.marzban_online ? (
+            {!data?.isMarzbanConfigured ? (
+              <span className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-800">
+                Not configured on server
+              </span>
+            ) : data?.marzban_online ? (
               <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-700">
                 <CheckCircle2 className="h-4 w-4" />
                 Online

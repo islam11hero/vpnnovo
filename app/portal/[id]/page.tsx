@@ -8,8 +8,11 @@ import {
 import { ClientDashboard } from "@/components/portal/ClientDashboard";
 import { RefreshButton } from "@/components/portal/RefreshButton";
 import { fetchMarzbanUser } from "@/lib/marzban";
+import { resolveMarzbanUsername } from "@/lib/orders";
+import { loadPortalActiveOrders } from "@/lib/portal-orders";
 import { isValidUuid } from "@/lib/uuid";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
+import { getSystemConfigFlags } from "@/lib/system-config";
 import type { SupabaseOrder } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -131,13 +134,24 @@ export default async function PortalDashboardPage({ params }: Props) {
     return <InvalidOrderId />;
   }
 
+  const systemConfig = getSystemConfigFlags();
+  if (!systemConfig.isSupabaseConfigured) {
+    return (
+      <div className="mx-auto max-w-lg pt-8 text-center">
+        <p className="text-sm font-medium text-slate-500">
+          Portal is temporarily unavailable. The billing database is not configured
+          on the server — contact support with your Order ID.
+        </p>
+      </div>
+    );
+  }
+
   const db = getSupabaseAdminResult();
   if (!db.ok) {
     return (
       <div className="mx-auto max-w-lg pt-8 text-center">
         <p className="text-sm font-medium text-slate-500">
-          Portal is temporarily unavailable. Billing database is not configured on
-          the server.
+          Portal is temporarily unavailable. Please try again in a moment.
         </p>
       </div>
     );
@@ -167,11 +181,42 @@ export default async function PortalDashboardPage({ params }: Props) {
     return <UnderpaidPaymentView orderId={orderId} />;
   }
 
+  if (row.status === "revoked") {
+    return (
+      <div className="mx-auto max-w-lg pt-4">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-10 text-center shadow-xl">
+          <AlertTriangle className="mx-auto mb-4 h-10 w-10 text-slate-500" />
+          <h1 className="font-poppins text-xl font-bold text-slate-900">
+            Node revoked
+          </h1>
+          <p className="mt-2 text-sm font-medium text-slate-500">
+            This VPN node was permanently revoked by you or an administrator.
+            Purchase a new shield to continue.
+          </p>
+          <Link
+            href="/#pricing"
+            className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-bold text-white hover:bg-[#3B82F6]"
+          >
+            View pricing
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (row.status === "paid") {
-    const marzbanUser = row.vpn_username
-      ? await fetchMarzbanUser(row.vpn_username)
-      : null;
-    return <ClientDashboard order={row} marzbanUser={marzbanUser} />;
+    const marzbanUsername = resolveMarzbanUsername(row);
+    const [marzbanUser, activeOrders] = await Promise.all([
+      marzbanUsername ? fetchMarzbanUser(marzbanUsername) : Promise.resolve(null),
+      loadPortalActiveOrders(orderId),
+    ]);
+    return (
+      <ClientDashboard
+        order={row}
+        marzbanUser={marzbanUser}
+        activeOrders={activeOrders}
+      />
+    );
   }
 
   return <InvalidOrderId />;

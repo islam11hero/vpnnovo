@@ -1,4 +1,5 @@
 import { getMarzbanApiUrl, marzbanFetch } from "@/lib/marzban-http";
+import type { MarzbanUserStats } from "@/lib/marzban-types";
 
 /** God-Tier dual-core: VLESS Vision TCP + gRPC (stable panel inbounds). */
 export const MARZBAN_PROXIES = {
@@ -26,11 +27,12 @@ const ALLOWED_PLANS = new Set([
   "1 Month",
   "6 Months",
   "1 Year",
+  "Normaroc Sovereign (OPSEC)",
 ]);
 
 export function planToExpireMonths(planName: string): number {
+  if (planName === "Normaroc Sovereign (OPSEC)" || planName === "1 Year") return 12;
   if (planName === "6 Months") return 6;
-  if (planName === "1 Year") return 12;
   return 1;
 }
 
@@ -451,12 +453,7 @@ export async function renewMarzbanUser(
   return { username: targetUsername, sub_link: subPath };
 }
 
-export type MarzbanUserStats = {
-  used_traffic: number;
-  data_limit: number;
-  expire: number | null;
-  status?: string;
-};
+export type { MarzbanUserStats } from "@/lib/marzban-types";
 
 /** Revoke subscription token and return the new subscription URL. */
 export async function revokeAndRefreshMarzbanSubscription(
@@ -511,31 +508,6 @@ export async function revokeAndRefreshMarzbanSubscription(
 export async function fetchMarzbanUser(
   targetUsername: string,
 ): Promise<MarzbanUserStats | null> {
-  try {
-    const { token } = await getMarzbanAdminToken();
-    const res = await marzbanFetch(
-      `/api/user/${encodeURIComponent(targetUsername)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      },
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      used_traffic?: number;
-      data_limit?: number;
-      expire?: number | null;
-      status?: string;
-    };
-    return {
-      used_traffic: data.used_traffic ?? 0,
-      data_limit: data.data_limit ?? 0,
-      expire: data.expire ?? null,
-      status: data.status,
-    };
-  } catch {
-    return null;
-  }
+  const { fetchMarzbanUserStats } = await import("@/lib/marzban/api");
+  return fetchMarzbanUserStats(targetUsername);
 }

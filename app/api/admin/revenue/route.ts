@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { buildRevenueChartData } from "@/lib/revenue-chart";
+import { buildGrowthChart } from "@/lib/noc-live-metrics";
 import { isAdminAuthenticated, unauthorizedAdminResponse } from "@/lib/require-admin";
-import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
+import { getSupabaseAdminResult } from "@/lib/supabase/admin";
+import type { SupabaseOrder } from "@/lib/supabase/types";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -11,9 +13,17 @@ export async function GET() {
     return unauthorizedAdminResponse();
   }
 
-  const db = requireSupabaseAdmin();
+  const db = getSupabaseAdminResult();
   if (!db.ok) {
-    return db.response;
+    console.error("[admin:revenue]", db.error);
+    return NextResponse.json({
+      success: true,
+      chartData: buildGrowthChart([]).map((d) => ({
+        name: d.name,
+        revenue: d.revenue,
+      })),
+      growth: buildGrowthChart([]),
+    });
   }
 
   const since = new Date();
@@ -21,18 +31,28 @@ export async function GET() {
 
   const { data: orders, error } = await db.client
     .from("orders")
-    .select("amount, created_at")
+    .select("amount, created_at, plan_name, status")
     .eq("status", "paid")
     .gte("created_at", since.toISOString());
 
   if (error) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 },
-    );
+    console.error("[admin:revenue]", error.message);
+    return NextResponse.json({
+      success: true,
+      chartData: buildGrowthChart([]).map((d) => ({
+        name: d.name,
+        revenue: d.revenue,
+      })),
+      growth: buildGrowthChart([]),
+    });
   }
 
-  const chartData = buildRevenueChartData(orders ?? []);
+  const paid = (orders ?? []) as SupabaseOrder[];
+  const growth = buildGrowthChart(paid);
 
-  return NextResponse.json({ success: true, chartData });
+  return NextResponse.json({
+    success: true,
+    chartData: growth.map((d) => ({ name: d.name, revenue: d.revenue })),
+    growth,
+  });
 }

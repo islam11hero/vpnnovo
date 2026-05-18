@@ -1,13 +1,9 @@
 "use client";
 
-import { Loader2, Settings2, ShieldBan, Trash2 } from "lucide-react";
+import { Loader2, Settings2, ShieldBan, Trash2, WifiOff } from "lucide-react";
 
-import type { MarzbanAdminAction } from "@/lib/marzban";
-import {
-  formatTraffic,
-  isActiveStatus,
-  type MarzbanUser,
-} from "@/lib/marzban-users";
+import type { AdminNodeRow } from "@/lib/admin-nodes";
+import { formatTraffic, isActiveStatus } from "@/lib/marzban-users";
 
 function usagePercent(used: number, limit: number): number {
   if (!limit || limit <= 0) return 0;
@@ -18,29 +14,32 @@ function statusLabel(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 }
 
+export type AdminNodeAction = "reset_usage" | "toggle_status" | "revoke";
+
 type Props = {
-  users: MarzbanUser[];
-  allUsersCount: number;
+  nodes: AdminNodeRow[];
+  allNodesCount: number;
   searchQuery: string;
-  processingUser: string | null;
-  onAction: (username: string, action: MarzbanAdminAction) => void;
+  processingKey: string | null;
+  onAction: (orderId: string, action: AdminNodeAction) => void;
 };
 
 export function CommandGrid({
-  users,
-  allUsersCount,
+  nodes,
+  allNodesCount,
   searchQuery,
-  processingUser,
+  processingKey,
   onAction,
 }: Props) {
-  const isProcessing = (username: string, action: MarzbanAdminAction) =>
-    processingUser === `${username}:${action}`;
+  const isProcessing = (orderId: string, action: AdminNodeAction) =>
+    processingKey === `${orderId}:${action}`;
 
-  if (allUsersCount === 0) {
+  if (allNodesCount === 0) {
     return (
       <div className="rounded-3xl border border-dashed border-slate-200/80 bg-white/90 p-12 text-center shadow-sm backdrop-blur-sm">
         <p className="text-sm font-medium text-slate-500">
-          No Marzban clients yet. Provision a shield from the storefront.
+          No VPN nodes in Supabase yet. Provision a shield from the storefront or
+          Create VIP.
         </p>
       </div>
     );
@@ -50,45 +49,50 @@ export function CommandGrid({
     <div className="overflow-hidden rounded-3xl border border-slate-200/60 bg-white/90 shadow-sm backdrop-blur-sm">
       <div className="border-b border-slate-200/60 bg-slate-50/80 p-6">
         <h2 className="text-lg font-bold text-slate-800">
-          Command Grid (Client Management)
+          Active Nodes (Supabase + Marzban)
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Live Marzban control — reset usage, suspend, or remove nodes.
+          Orders are the source of truth; bandwidth is live from Marzban when
+          reachable.
         </p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="border-b border-slate-200/80 bg-white text-xs tracking-wider text-slate-400 uppercase">
-              <th className="p-5 font-bold">Client Identity</th>
+              <th className="p-5 font-bold">Order / Marzban User</th>
+              <th className="p-5 font-bold">Plan</th>
               <th className="p-5 font-bold">Data Utilization</th>
               <th className="p-5 font-bold">Shield Status</th>
               <th className="p-5 text-right font-bold">Admin Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {users.length === 0 ? (
+            {nodes.length === 0 ? (
               <tr>
-                <td colSpan={4} className="p-12 text-center">
+                <td colSpan={5} className="p-12 text-center">
                   <p className="text-sm font-medium text-slate-500">
-                    No clients match &ldquo;{searchQuery}&rdquo;. Try another
-                    username.
+                    No nodes match &ldquo;{searchQuery}&rdquo;.
                   </p>
                 </td>
               </tr>
             ) : (
-              users.map((user) => {
-                const used = user.used_traffic ?? 0;
-                const limit = user.data_limit ?? 0;
-                const active = isActiveStatus(user.status);
+              nodes.map((node) => {
+                const used = node.usedTraffic;
+                const limit = node.dataLimit;
+                const active =
+                  node.orderStatus !== "revoked" &&
+                  isActiveStatus(node.marzbanStatus);
                 const pct = usagePercent(used, limit);
                 const atCap = limit > 0 && used >= limit;
                 const rowBusy =
-                  processingUser?.startsWith(`${user.username}:`) ?? false;
+                  processingKey?.startsWith(`${node.orderId}:`) ?? false;
+                const username =
+                  node.marzbanUsername ?? "—";
 
                 return (
                   <tr
-                    key={user.username}
+                    key={node.orderId}
                     className="transition-colors duration-200 hover:bg-slate-50"
                   >
                     <td className="p-5">
@@ -97,13 +101,29 @@ export function CommandGrid({
                           className={`h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ${
                             active
                               ? "bg-emerald-500 shadow-emerald-500/50"
-                              : "bg-red-500 shadow-red-500/50"
+                              : node.orderStatus === "revoked"
+                                ? "bg-slate-400"
+                                : "bg-red-500 shadow-red-500/50"
                           }`}
                         />
-                        <span className="font-bold text-slate-800">
-                          {user.username}
-                        </span>
+                        <div>
+                          <span className="font-bold text-slate-800">
+                            {username}
+                          </span>
+                          <p className="font-mono text-xs text-slate-400">
+                            {node.orderId.slice(0, 8)}…
+                          </p>
+                        </div>
                       </div>
+                      {!node.telemetryLive && node.orderStatus !== "revoked" ? (
+                        <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                          <WifiOff className="h-3 w-3" />
+                          Telemetry offline
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="p-5 text-sm font-bold text-slate-700">
+                      {node.planName}
                     </td>
                     <td className="p-5">
                       <div className="w-56 min-w-[12rem]">
@@ -128,16 +148,20 @@ export function CommandGrid({
                     <td className="p-5">
                       <span
                         className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${
-                          active
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-slate-200 bg-slate-50 text-slate-600"
+                          node.orderStatus === "revoked"
+                            ? "border-slate-300 bg-slate-100 text-slate-600"
+                            : active
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-slate-200 bg-slate-50 text-slate-600"
                         }`}
                       >
-                        {statusLabel(user.status)}
+                        {node.orderStatus === "revoked"
+                          ? "Revoked"
+                          : statusLabel(node.marzbanStatus)}
                       </span>
-                      {user.note ? (
+                      {node.note ? (
                         <p className="mt-1 max-w-[180px] truncate text-xs text-slate-400">
-                          {user.note}
+                          {node.note}
                         </p>
                       ) : null}
                     </td>
@@ -145,12 +169,12 @@ export function CommandGrid({
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
-                          disabled={rowBusy}
-                          onClick={() => onAction(user.username, "reset_usage")}
+                          disabled={rowBusy || node.orderStatus === "revoked"}
+                          onClick={() => onAction(node.orderId, "reset_usage")}
                           className="rounded-xl border border-transparent p-2 text-slate-400 transition-all hover:border-blue-100 hover:bg-blue-50 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
                           title="Reset usage"
                         >
-                          {isProcessing(user.username, "reset_usage") ? (
+                          {isProcessing(node.orderId, "reset_usage") ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <Settings2 className="h-4 w-4" />
@@ -158,9 +182,9 @@ export function CommandGrid({
                         </button>
                         <button
                           type="button"
-                          disabled={rowBusy}
+                          disabled={rowBusy || node.orderStatus === "revoked"}
                           onClick={() =>
-                            onAction(user.username, "toggle_status")
+                            onAction(node.orderId, "toggle_status")
                           }
                           className="rounded-xl border border-transparent p-2 text-slate-400 transition-all hover:border-amber-100 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                           title={
@@ -169,7 +193,7 @@ export function CommandGrid({
                               : "Activate connection"
                           }
                         >
-                          {isProcessing(user.username, "toggle_status") ? (
+                          {isProcessing(node.orderId, "toggle_status") ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <ShieldBan className="h-4 w-4" />
@@ -177,12 +201,12 @@ export function CommandGrid({
                         </button>
                         <button
                           type="button"
-                          disabled={rowBusy}
-                          onClick={() => onAction(user.username, "delete")}
+                          disabled={rowBusy || node.orderStatus === "revoked"}
+                          onClick={() => onAction(node.orderId, "revoke")}
                           className="rounded-xl border border-transparent p-2 text-red-400 transition-all hover:border-red-100 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                          title="Delete user permanently"
+                          title="Revoke node (delete Marzban user)"
                         >
-                          {isProcessing(user.username, "delete") ? (
+                          {isProcessing(node.orderId, "revoke") ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
                             <Trash2 className="h-4 w-4" />

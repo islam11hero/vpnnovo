@@ -27,13 +27,20 @@ export async function POST(request: Request) {
       ? (body as { planName: string }).planName.trim()
       : "";
 
-  const billing =
+  const billingRaw =
     typeof body === "object" &&
     body !== null &&
     "billing" in body &&
-    (body as { billing: unknown }).billing === "annual"
-      ? "annual"
+    typeof (body as { billing: unknown }).billing === "string"
+      ? (body as { billing: string }).billing
       : "monthly";
+
+  const billing =
+    billingRaw === "sovereign"
+      ? "sovereign"
+      : billingRaw === "annual"
+        ? "annual"
+        : "monthly";
 
   if (!planName || !isAllowedPlan(planName)) {
     return jsonError("Invalid or missing planName", 400);

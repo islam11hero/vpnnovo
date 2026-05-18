@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   CreditCard,
+  Radar,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -17,6 +18,12 @@ const navItems = [
   { href: ADMIN_ROUTES.overview, label: "Overview", icon: LayoutDashboard, match: "/admin" },
   { href: ADMIN_ROUTES.clients, label: "Client Control", icon: Users, match: "/admin/clients" },
   { href: ADMIN_ROUTES.finances, label: "Finances", icon: CreditCard, match: "/admin/finances" },
+  {
+    href: ADMIN_ROUTES.monitoring,
+    label: "Monitoring",
+    icon: Radar,
+    match: "/admin/monitoring",
+  },
   { href: ADMIN_ROUTES.settings, label: "Settings", icon: Settings, match: "/admin/settings" },
 ] as const;
 

@@ -15,7 +15,7 @@ export function AdminHeaderSearch() {
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         placeholder="Search clients by username..."
-        className="w-full rounded-full border border-slate-200/80 bg-slate-50/90 py-2.5 pr-4 pl-11 text-sm transition-all focus:border-[#3B82F6]/40 focus:ring-2 focus:ring-[#3B82F6]/20 focus:outline-none"
+        className="w-full rounded-lg border border-slate-800 bg-slate-900/80 py-2.5 pr-4 pl-11 text-sm text-slate-200 placeholder:text-slate-600 transition-all focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none"
       />
     </div>
   );

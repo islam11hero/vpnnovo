@@ -5,6 +5,7 @@ export const ADMIN_ROUTES = {
   overview: "/admin",
   clients: "/admin/clients",
   finances: "/admin/finances",
+  monitoring: "/admin/monitoring",
   settings: "/admin/settings",
   login: ADMIN_LOGIN_PATH,
 } as const;
@@ -14,6 +15,7 @@ const ADMIN_ALLOWED_PATHS = new Set<string>([
   ADMIN_HOME_PATH,
   ADMIN_ROUTES.clients,
   ADMIN_ROUTES.finances,
+  ADMIN_ROUTES.monitoring,
   ADMIN_ROUTES.settings,
 ]);
 

@@ -1,4 +1,4 @@
-export type TicketStatus = "open" | "resolved" | "pending";
+export type TicketStatus = "open" | "closed" | "resolved" | "pending";
 
 export type SupportTicket = {
   id: string;

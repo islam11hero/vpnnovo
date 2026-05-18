@@ -14,9 +14,16 @@ export type SupabaseServiceEnv = SupabasePublicEnv & {
   serviceRoleKey: string;
 };
 
+function getSupabaseAnonKey(): string {
+  return (
+    clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||
+    clean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+  );
+}
+
 export function getSupabasePublicEnv(): SupabasePublicEnv | null {
   const url = clean(process.env.NEXT_PUBLIC_SUPABASE_URL).replace(/\/$/, "");
-  const anonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const anonKey = getSupabaseAnonKey();
   if (!url || !anonKey) return null;
   return { url, anonKey };
 }
@@ -33,8 +40,8 @@ export function listMissingSupabaseServiceKeys(): string[] {
   if (!clean(process.env.NEXT_PUBLIC_SUPABASE_URL)) {
     missing.push("NEXT_PUBLIC_SUPABASE_URL");
   }
-  if (!clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)) {
-    missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  if (!getSupabaseAnonKey()) {
+    missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)");
   }
   if (!clean(process.env.SUPABASE_SERVICE_ROLE_KEY)) {
     missing.push("SUPABASE_SERVICE_ROLE_KEY");
