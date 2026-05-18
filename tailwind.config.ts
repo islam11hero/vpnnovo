@@ -8,9 +8,17 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        poppins: ["var(--font-poppins)", "system-ui", "sans-serif"],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+      },
+      boxShadow: {
+        apple:
+          "0 8px 30px rgb(0 0 0 / 0.04)",
       },
     },
   },
