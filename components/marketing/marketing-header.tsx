@@ -8,9 +8,9 @@ import { ChevronDown, Menu, Shield, X } from "lucide-react";
 import { DEPLOYMENT_PLATFORMS } from "@/components/marketing/os-icons";
 
 const NAV_LINKS = [
-  { href: "#bento", label: "Architecture" },
-  { href: "#experts", label: "Proof" },
+  { href: "#use-cases", label: "Use Cases" },
   { href: "#pricing", label: "Pricing" },
+  { href: "/sales", label: "Enterprise" },
 ] as const;
 
 export function MarketingHeader() {
@@ -109,7 +109,7 @@ export function MarketingHeader() {
             href="#pricing"
             className="relative overflow-hidden rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-2.5 text-sm font-black text-white shadow-lg shadow-cyan-500/30 transition hover:shadow-cyan-500/50"
           >
-            <span className="relative z-10">Deploy Node Now</span>
+            <span className="relative z-10">Get Started</span>
             <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 transition hover:opacity-100" />
           </a>
         </div>
@@ -167,7 +167,7 @@ export function MarketingHeader() {
                 href="#pricing"
                 className="mt-2 block rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-3 text-center text-sm font-black text-white"
               >
-                Deploy Node Now
+                Get Started
               </a>
             </div>
           </motion.div>

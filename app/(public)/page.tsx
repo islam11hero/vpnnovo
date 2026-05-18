@@ -1,10 +1,8 @@
-import { BentoGrid } from "@/components/marketing/bento-grid";
+import { B2BUseCasesGrid } from "@/components/marketing/b2b-use-cases";
+import { EnterprisePricingSection } from "@/components/marketing/enterprise-pricing";
 import { HeroSection } from "@/components/marketing/hero-section";
-import { MarketingFooter } from "@/components/marketing/marketing-footer";
 import { MarketingHeader } from "@/components/marketing/marketing-header";
 import { MarketingJsonLd } from "@/components/marketing/marketing-json-ld";
-import { SocialProofSection } from "@/components/marketing/social-proof";
-import { PricingSection } from "@/components/PricingSection";
 
 export default function HomePage() {
   return (
@@ -16,12 +14,9 @@ export default function HomePage() {
 
         <main>
           <HeroSection />
-          <BentoGrid />
-          <SocialProofSection />
-          <PricingSection theme="dark" />
+          <B2BUseCasesGrid />
+          <EnterprisePricingSection />
         </main>
-
-        <MarketingFooter />
       </div>
     </>
   );

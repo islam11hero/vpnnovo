@@ -8,15 +8,15 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const poppins = Poppins({ weight: ['400', '600', '700', '800', '900'], subsets: ['latin'], variable: '--font-poppins' });
 
 export const metadata: Metadata = {
-  title: 'IPNOVA | Post-Quantum Stealth VPN for Privacy Whales',
+  title: 'IPNOVA | Enterprise Network Intelligence & Ad Verification',
   description:
-    'RAM-only VPN nodes, Anti-DPI stealth engine, Monero-native checkout, and zero-knowledge ghost accounts. Infrastructure built for OPSEC professionals and privacy whales.',
+    'Global network infrastructure for enterprise data intelligence. Ad verification, brand protection, and Zero-Trust remote access with AES-256 encryption.',
   keywords:
-    'stealth VPN, anti-DPI, post-quantum VPN, RAM-only VPN, Monero VPN, no logs VPN, IPNOVA, privacy whale, OPSEC VPN',
+    'ad verification, network intelligence, brand protection, zero trust, enterprise data infrastructure, IPNOVA',
   openGraph: {
-    title: 'IPNOVA — Cyber-Elite Stealth Infrastructure',
+    title: 'IPNOVA — Network Intelligence & Ad Verification',
     description:
-      'Bypass national DPI without speed loss. Volatile egress, untraceable XMR settlement, UUID-only portal.',
+      'Empower corporate remote teams with Zero-Trust network access and secure market research pipelines.',
     type: 'website',
   },
 };
