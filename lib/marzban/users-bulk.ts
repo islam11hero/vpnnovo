@@ -14,6 +14,8 @@ export type MarzbanUserRecord = {
   proxies: Record<string, unknown>;
   onlines_limit: number | null;
   online_at: string | null;
+  subscription_url: string | null;
+  links: string[];
 };
 
 function parseUser(raw: Record<string, unknown>): MarzbanUserRecord {
@@ -21,6 +23,11 @@ function parseUser(raw: Record<string, unknown>): MarzbanUserRecord {
     raw.proxies && typeof raw.proxies === "object"
       ? (raw.proxies as Record<string, unknown>)
       : {};
+
+  const linksRaw = raw.links;
+  const links = Array.isArray(linksRaw)
+    ? linksRaw.map((l) => String(l)).filter(Boolean)
+    : [];
 
   return {
     username: String(raw.username ?? ""),
@@ -33,6 +40,9 @@ function parseUser(raw: Record<string, unknown>): MarzbanUserRecord {
     onlines_limit:
       raw.onlines_limit != null ? Number(raw.onlines_limit) : null,
     online_at: raw.online_at != null ? String(raw.online_at) : null,
+    subscription_url:
+      raw.subscription_url != null ? String(raw.subscription_url) : null,
+    links,
   };
 }
 

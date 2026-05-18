@@ -1,4 +1,5 @@
 import { getMarzbanApiUrl, marzbanFetch } from "@/lib/marzban-http";
+import { validateMarzbanUsername } from "@/lib/marzban-validation";
 import type { MarzbanUserStats } from "@/lib/marzban-types";
 
 /** God-Tier dual-core: VLESS Vision TCP + gRPC (stable panel inbounds). */
@@ -15,11 +16,73 @@ export const MARZBAN_INBOUNDS = {
   ],
 } as const;
 
-/** Shared proxies + inbounds for every POST /api/user payload. */
+/** @deprecated Use buildMarzbanCreateUserBody for POST /api/user — hardcoded inbounds break on live panels. */
 export const MARZBAN_USER_CORE = {
   proxies: MARZBAN_PROXIES,
   inbounds: MARZBAN_INBOUNDS,
 } as const;
+
+export { validateMarzbanUsername, MARZBAN_USERNAME_PATTERN } from "@/lib/marzban-validation";
+
+/** POST /api/user — omit inbounds so Marzban assigns all active default inbounds. */
+export function buildMarzbanCreateUserBody(input: {
+  username: string;
+  expire: number;
+  data_limit: number;
+  note: string;
+  status?: "active" | "disabled";
+}) {
+  return {
+    username: input.username,
+    proxies: { vless: {} },
+    expire: input.expire,
+    data_limit: input.data_limit,
+    data_limit_reset_strategy: "no_reset" as const,
+    status: input.status ?? "active",
+    note: input.note,
+  };
+}
+
+export function parseMarzbanErrorText(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as {
+      detail?: string | Record<string, unknown>;
+    };
+    if (typeof parsed.detail === "string") return parsed.detail;
+    if (parsed.detail && typeof parsed.detail === "object") {
+      const parts = Object.entries(parsed.detail).map(
+        ([k, v]) => `${k}: ${String(v)}`,
+      );
+      if (parts.length) return parts.join(" · ");
+    }
+  } catch {
+    /* plain text */
+  }
+  return raw.slice(0, 400);
+}
+
+export function isMarzbanUsernameTakenError(
+  status: number,
+  rawBody: string,
+): boolean {
+  if (status === 409) return true;
+  const lower = rawBody.toLowerCase();
+  return (
+    lower.includes("already exists") ||
+    lower.includes("username already") ||
+    lower.includes("duplicate")
+  );
+}
+
+export function extractMarzbanSubscriptionLink(
+  apiUrl: string,
+  userData: {
+    subscription_url?: string;
+    links?: string[];
+  },
+): string {
+  return resolveSubscriptionUrl(apiUrl, userData);
+}
 
 const ALLOWED_PLANS = new Set([
   "Standard",
@@ -187,6 +250,84 @@ export async function executeMarzbanAdminAction(
   }
 }
 
+/** Set Marzban user status without toggling (activate / suspend). */
+export async function setMarzbanUserStatus(
+  targetUsername: string,
+  status: "active" | "disabled",
+): Promise<void> {
+  const { token } = await getMarzbanAdminToken();
+  const encoded = encodeURIComponent(targetUsername);
+  const authHeaders = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+  };
+
+  const getRes = await marzbanFetch(`/api/user/${encoded}`, {
+    headers: authHeaders,
+  });
+  if (!getRes.ok) {
+    const errText = await getRes.text();
+    throw new MarzbanError(
+      `Failed to fetch user: ${errText.slice(0, 300)}`,
+      getRes.status,
+    );
+  }
+
+  const existing = (await getRes.json()) as Record<string, unknown>;
+  const putRes = await marzbanFetch(`/api/user/${encoded}`, {
+    method: "PUT",
+    headers: {
+      ...authHeaders,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...existing,
+      status,
+    }),
+  });
+
+  if (!putRes.ok) {
+    const errText = await putRes.text();
+    throw new MarzbanError(
+      `Failed to update status: ${errText.slice(0, 300)}`,
+      putRes.status,
+    );
+  }
+}
+
+/** Resolve subscription URL for a single Marzban user. */
+export async function fetchMarzbanUserSubscriptionLink(
+  targetUsername: string,
+): Promise<string> {
+  const { apiUrl, token } = await getMarzbanAdminToken();
+  const encoded = encodeURIComponent(targetUsername);
+  const res = await marzbanFetch(`/api/user/${encoded}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new MarzbanError(
+      `Failed to fetch user: ${errText.slice(0, 300)}`,
+      res.status,
+    );
+  }
+
+  const userData = (await res.json()) as {
+    subscription_url?: string;
+    links?: string[];
+  };
+
+  const link = extractMarzbanSubscriptionLink(apiUrl, userData);
+  if (!link) {
+    throw new MarzbanError("No subscription link on user record", 404);
+  }
+  return link;
+}
+
 const TRIAL_DATA_LIMIT_BYTES = 1073741824; // 1 GB — strict cap
 const TRIAL_DURATION_SECONDS = 24 * 60 * 60; // 24 hours
 
@@ -242,13 +383,19 @@ export async function provisionTrialMarzbanUser(
   return { username, sub_link: subPath };
 }
 
-/** Admin manual / VIP provisioning with custom duration and data cap. */
+/** Admin manual / VIP free-tier provisioning with custom duration and data cap. */
 export async function provisionManualMarzbanUser(params: {
+  username: string;
   planName: string;
   months: number;
   dataLimitGb: number;
 }): Promise<MarzbanProvisionResult> {
   const planName = params.planName.trim();
+  const username = params.username.trim();
+  const usernameError = validateMarzbanUsername(username);
+  if (usernameError) {
+    throw new MarzbanError(usernameError, 400);
+  }
   if (!planName) {
     throw new MarzbanError("Invalid or missing plan_name", 400);
   }
@@ -264,24 +411,18 @@ export async function provisionManualMarzbanUser(params: {
   }
 
   const { apiUrl, token } = await getMarzbanAdminToken();
-  const username = `vip_${Math.random().toString(36).substring(2, 10)}`;
   const expireDate = new Date();
   expireDate.setMonth(expireDate.getMonth() + Math.floor(params.months));
   const expireTimestamp = Math.floor(expireDate.getTime() / 1000);
   const data_limit =
-    params.dataLimitGb <= 0
-      ? 0
-      : Math.floor(params.dataLimitGb * 1073741824);
+    params.dataLimitGb <= 0 ? 0 : Math.floor(params.dataLimitGb * 1024 ** 3);
 
-  const payload = {
+  const payload = buildMarzbanCreateUserBody({
     username,
-    ...MARZBAN_USER_CORE,
     expire: expireTimestamp,
     data_limit,
-    data_limit_reset_strategy: "no_reset" as const,
-    status: "active" as const,
-    note: `VIP Manual · ${planName}`,
-  };
+    note: `VIP Free · ${planName}`,
+  });
 
   const userRes = await marzbanFetch("/api/user", {
     method: "POST",
@@ -295,7 +436,17 @@ export async function provisionManualMarzbanUser(params: {
 
   if (!userRes.ok) {
     const errText = await userRes.text();
-    throw new MarzbanError(`Marzban Error: ${errText.slice(0, 500)}`, 500);
+    const status = userRes.status;
+    if (isMarzbanUsernameTakenError(status, errText)) {
+      throw new MarzbanError(
+        "Username already taken, please choose another.",
+        409,
+      );
+    }
+    throw new MarzbanError(
+      `Marzban Error: ${parseMarzbanErrorText(errText)}`,
+      status >= 400 && status < 600 ? status : 500,
+    );
   }
 
   const userData = (await userRes.json()) as {
@@ -303,7 +454,7 @@ export async function provisionManualMarzbanUser(params: {
     links?: string[];
   };
 
-  const subPath = resolveSubscriptionUrl(apiUrl, userData);
+  const subPath = extractMarzbanSubscriptionLink(apiUrl, userData);
   if (!subPath) {
     throw new MarzbanError("Marzban returned no subscription URL", 502);
   }
@@ -337,15 +488,12 @@ export async function provisionMarzbanUser(
   const expireTimestamp = Math.floor(expireDate.getTime() / 1000);
   const randomUsername = `IPNOVA_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-  const payload = {
+  const payload = buildMarzbanCreateUserBody({
     username: randomUsername,
-    ...MARZBAN_USER_CORE,
     expire: expireTimestamp,
     data_limit: 0,
-    data_limit_reset_strategy: "no_reset" as const,
-    status: "active" as const,
     note: `Plan: ${planName}`,
-  };
+  });
 
   const userRes = await marzbanFetch("/api/user", {
     method: "POST",
@@ -359,7 +507,10 @@ export async function provisionMarzbanUser(
 
   if (!userRes.ok) {
     const errText = await userRes.text();
-    throw new MarzbanError(`Marzban Error: ${errText.slice(0, 500)}`, 500);
+    throw new MarzbanError(
+      `Marzban Error: ${parseMarzbanErrorText(errText)}`,
+      userRes.status >= 400 && userRes.status < 600 ? userRes.status : 500,
+    );
   }
 
   const userData = (await userRes.json()) as {
