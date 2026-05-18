@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import type { SupportTicketWithOrder } from "@/lib/tickets";
 import { isAdminAuthenticated, unauthorizedAdminResponse } from "@/lib/require-admin";
-import { supabaseAdmin } from "@/lib/supabase";
+import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,11 +33,12 @@ export async function GET() {
     return unauthorizedAdminResponse();
   }
 
-  if (!supabaseAdmin) {
-    return jsonError("Database not configured", 500);
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await db.client
     .from("tickets")
     .select(
       `
@@ -86,8 +87,9 @@ export async function PATCH(request: Request) {
     return unauthorizedAdminResponse();
   }
 
-  if (!supabaseAdmin) {
-    return jsonError("Database not configured", 500);
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
   }
 
   let body: unknown;
@@ -129,7 +131,7 @@ export async function PATCH(request: Request) {
     return jsonError("admin_reply is required", 400);
   }
 
-  const { data: ticket, error } = await supabaseAdmin
+  const { data: ticket, error } = await db.client
     .from("tickets")
     .update({
       admin_reply,

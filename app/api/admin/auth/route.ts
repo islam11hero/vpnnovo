@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, ADMIN_SESSION_MAX_AGE } from "@/lib/admin-auth-constants";
 import { getAdminSecret } from "@/lib/admin-secret";
 import { getAdminSessionToken } from "@/lib/admin-session";
+import { secureCompareStrings } from "@/lib/secure-compare";
 
 export const runtime = "nodejs";
 
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
       ? (body as { password: string }).password
       : "";
 
-  if (!password || password !== adminSecret) {
+  if (!password || !secureCompareStrings(password, adminSecret)) {
     return jsonError("Invalid credentials", 401);
   }
 

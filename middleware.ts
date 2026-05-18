@@ -4,14 +4,10 @@ import type { NextRequest } from "next/server";
 import { resolveAdminRedirectPath } from "@/lib/admin-access";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth-constants";
 import { isValidAdminSessionEdge } from "@/lib/admin-session-edge";
+import { enforceTrialEdgeRateLimit } from "@/lib/edge/trial-rate-limit";
 
-export async function middleware(request: NextRequest) {
+async function handleAdmin(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
-
-  if (!pathname.startsWith("/admin")) {
-    return NextResponse.next();
-  }
-
   const session = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
 
   if (pathname === "/admin/login" || pathname.startsWith("/admin/login/")) {
@@ -36,6 +32,19 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+export async function middleware(request: NextRequest) {
+  const trialBlock = enforceTrialEdgeRateLimit(request);
+  if (trialBlock) {
+    return trialBlock;
+  }
+
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    return handleAdmin(request);
+  }
+
+  return NextResponse.next();
+}
+
 export const config = {
-  matcher: ["/admin", "/admin/:path*"],
+  matcher: ["/admin", "/admin/:path*", "/api/checkout/trial"],
 };

@@ -10,7 +10,8 @@ import {
   extractPaymentMeta,
   verifyNowPaymentsSignature,
 } from "@/lib/nowpayments";
-import { supabaseAdmin, type SupabaseOrder } from "@/lib/supabase";
+import type { SupabaseOrder } from "@/lib/supabase/types";
+import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,9 +23,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "IPN not configured" }, { status: 500 });
   }
 
-  if (!supabaseAdmin) {
-    console.error("[nowpay IPN] Supabase admin is not configured");
-    return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    console.error("[nowpay IPN] Supabase not configured", db.response);
+    return db.response;
   }
 
   let rawBody: string;
@@ -61,7 +63,7 @@ export async function POST(request: Request) {
   const acceptance = evaluatePaymentAcceptance(payload);
   const { paymentCurrency, txHash } = extractPaymentMeta(payload);
 
-  const { data: existing, error: fetchError } = await supabaseAdmin
+  const { data: existing, error: fetchError } = await db.client
     .from("orders")
     .select("*")
     .eq("id", orderId)
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
   }
 
   if (acceptance === "failed") {
-    await supabaseAdmin
+    await db.client
       .from("orders")
       .update({ status: "failed" })
       .eq("id", orderId);
@@ -87,7 +89,7 @@ export async function POST(request: Request) {
   }
 
   if (acceptance === "underpaid") {
-    await supabaseAdmin
+    await db.client
       .from("orders")
       .update({ status: "underpaid" })
       .eq("id", orderId);
@@ -118,7 +120,7 @@ export async function POST(request: Request) {
       sub_link = provisioned.sub_link;
     }
 
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await db.client
       .from("orders")
       .update({
         status: "paid",
@@ -153,7 +155,7 @@ export async function POST(request: Request) {
 
     console.error("[nowpay IPN] Marzban error:", message);
 
-    await supabaseAdmin
+    await db.client
       .from("orders")
       .update({ status: "failed" })
       .eq("id", orderId);

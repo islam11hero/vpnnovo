@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isValidUuid } from "@/lib/uuid";
-import { supabaseAdmin } from "@/lib/supabase";
+import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +11,9 @@ function jsonError(message: string, status: number) {
 }
 
 export async function GET(request: Request) {
-  if (!supabaseAdmin) {
-    return jsonError("Database not configured", 500);
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
   }
 
   const { searchParams } = new URL(request.url);
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
     return jsonError("Invalid or missing order_id", 400);
   }
 
-  const { data: order } = await supabaseAdmin
+  const { data: order } = await db.client
     .from("orders")
     .select("id")
     .eq("id", orderId)
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
     return jsonError("Order not found", 404);
   }
 
-  const { data: tickets, error } = await supabaseAdmin
+  const { data: tickets, error } = await db.client
     .from("tickets")
     .select("*")
     .eq("order_id", orderId)
@@ -46,8 +47,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!supabaseAdmin) {
-    return jsonError("Database not configured", 500);
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
   }
 
   let body: unknown;
@@ -93,7 +95,7 @@ export async function POST(request: Request) {
     return jsonError("Message must be between 10 and 5000 characters", 400);
   }
 
-  const { data: order } = await supabaseAdmin
+  const { data: order } = await db.client
     .from("orders")
     .select("id, status")
     .eq("id", order_id)
@@ -103,7 +105,7 @@ export async function POST(request: Request) {
     return jsonError("Order not found", 404);
   }
 
-  const { data: ticket, error } = await supabaseAdmin
+  const { data: ticket, error } = await db.client
     .from("tickets")
     .insert({
       order_id,

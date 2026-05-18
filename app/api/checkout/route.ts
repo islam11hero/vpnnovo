@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
 
+import { jsonError } from "@/lib/api/json-error";
 import { isAllowedPlan } from "@/lib/marzban";
 import { createNowPaymentsInvoice } from "@/lib/nowpayments-invoice";
-import { supabaseAdmin } from "@/lib/supabase";
-
-function jsonError(message: string, status: number) {
-  return NextResponse.json({ success: false, error: message }, { status });
-}
+import { resolvePlanAmountUsd } from "@/lib/plan-pricing";
+import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
 export async function POST(request: Request) {
-  if (!supabaseAdmin) {
-    return jsonError("Supabase admin client is not configured", 500);
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
   }
 
   let body: unknown;
@@ -28,23 +27,24 @@ export async function POST(request: Request) {
       ? (body as { planName: string }).planName.trim()
       : "";
 
-  const amount =
+  const billing =
     typeof body === "object" &&
     body !== null &&
-    "amount" in body &&
-    typeof (body as { amount: unknown }).amount === "number"
-      ? (body as { amount: number }).amount
-      : NaN;
+    "billing" in body &&
+    (body as { billing: unknown }).billing === "annual"
+      ? "annual"
+      : "monthly";
 
   if (!planName || !isAllowedPlan(planName)) {
     return jsonError("Invalid or missing planName", 400);
   }
 
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return jsonError("Invalid or missing amount", 400);
+  const amount = resolvePlanAmountUsd(planName, billing);
+  if (amount === null || amount <= 0) {
+    return jsonError("Unknown plan pricing", 400);
   }
 
-  const { data: order, error: insertError } = await supabaseAdmin
+  const { data: order, error: insertError } = await db.client
     .from("orders")
     .insert({
       plan_name: planName,
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
   if (insertError || !order?.id) {
     return jsonError(
-      insertError?.message ?? "Failed to create order in Supabase",
+      "Could not start checkout. Please try again in a moment.",
       500,
     );
   }
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       order_id: orderId,
     });
   } catch (e) {
-    await supabaseAdmin
+    await db.client
       .from("orders")
       .update({ status: "failed" })
       .eq("id", orderId);

@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { extractClientIp } from "@/lib/request-ip";
+
+export { extractClientIp };
 
 export const TRIAL_CLAIMED_COOKIE = "trial_claimed";
 export const TRIAL_FRAUD_MESSAGE =
@@ -6,17 +9,6 @@ export const TRIAL_FRAUD_MESSAGE =
 
 const DEVICE_HASH_MIN = 8;
 const DEVICE_HASH_MAX = 128;
-
-export function extractClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first.slice(0, 64);
-  }
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp.slice(0, 64);
-  return "unknown";
-}
 
 export function normalizeDeviceHash(raw: unknown): string | null {
   if (typeof raw !== "string") return null;

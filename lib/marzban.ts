@@ -1,3 +1,5 @@
+import { getMarzbanApiUrl, marzbanFetch } from "@/lib/marzban-http";
+
 /** God-Tier dual-core: VLESS Vision TCP + gRPC (stable panel inbounds). */
 export const MARZBAN_PROXIES = {
   vless: {
@@ -66,12 +68,15 @@ export class MarzbanError extends Error {
 
 export type MarzbanAdminAction = "toggle_status" | "reset_usage" | "delete";
 
-function getMarzbanEnv() {
-  const apiUrl = process.env.MARZBAN_API_URL?.replace(/\/$/, "");
-  const username = process.env.MARZBAN_USERNAME;
-  const password = process.env.MARZBAN_PASSWORD;
-  if (!apiUrl || !username || !password) {
-    throw new MarzbanError("Missing .env credentials", 500);
+function getMarzbanCredentials() {
+  const apiUrl = getMarzbanApiUrl();
+  const username = process.env.MARZBAN_USERNAME?.trim();
+  const password = process.env.MARZBAN_PASSWORD?.trim();
+  if (!username || !password) {
+    throw new MarzbanError(
+      "Missing MARZBAN_USERNAME or MARZBAN_PASSWORD in environment",
+      500,
+    );
   }
   return { apiUrl, username, password };
 }
@@ -80,9 +85,9 @@ export async function getMarzbanAdminToken(): Promise<{
   apiUrl: string;
   token: string;
 }> {
-  const { apiUrl, username, password } = getMarzbanEnv();
+  const { apiUrl, username, password } = getMarzbanCredentials();
 
-  const tokenRes = await fetch(`${apiUrl}/api/admin/token`, {
+  const tokenRes = await marzbanFetch("/api/admin/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -93,7 +98,6 @@ export async function getMarzbanAdminToken(): Promise<{
       password,
       grant_type: "password",
     }),
-    cache: "no-store",
   });
 
   if (!tokenRes.ok) {
@@ -113,7 +117,7 @@ export async function executeMarzbanAdminAction(
   action: MarzbanAdminAction,
   targetUsername: string,
 ): Promise<void> {
-  const { apiUrl, token } = await getMarzbanAdminToken();
+  const { token } = await getMarzbanAdminToken();
   const encoded = encodeURIComponent(targetUsername);
   const authHeaders = {
     Authorization: `Bearer ${token}`,
@@ -121,9 +125,8 @@ export async function executeMarzbanAdminAction(
   };
 
   if (action === "toggle_status") {
-    const getRes = await fetch(`${apiUrl}/api/user/${encoded}`, {
+    const getRes = await marzbanFetch(`/api/user/${encoded}`, {
       headers: authHeaders,
-      cache: "no-store",
     });
     if (!getRes.ok) {
       const errText = await getRes.text();
@@ -134,7 +137,7 @@ export async function executeMarzbanAdminAction(
     }
     const user = (await getRes.json()) as { status?: string };
     const isActive = user.status?.toLowerCase() === "active";
-    const putRes = await fetch(`${apiUrl}/api/user/${encoded}`, {
+    const putRes = await marzbanFetch(`/api/user/${encoded}`, {
       method: "PUT",
       headers: {
         ...authHeaders,
@@ -143,7 +146,6 @@ export async function executeMarzbanAdminAction(
       body: JSON.stringify({
         status: isActive ? "disabled" : "active",
       }),
-      cache: "no-store",
     });
     if (!putRes.ok) {
       const errText = await putRes.text();
@@ -156,10 +158,9 @@ export async function executeMarzbanAdminAction(
   }
 
   if (action === "reset_usage") {
-    const resetRes = await fetch(`${apiUrl}/api/user/${encoded}/reset`, {
+    const resetRes = await marzbanFetch(`/api/user/${encoded}/reset`, {
       method: "POST",
       headers: authHeaders,
-      cache: "no-store",
     });
     if (!resetRes.ok) {
       const errText = await resetRes.text();
@@ -171,10 +172,9 @@ export async function executeMarzbanAdminAction(
     return;
   }
 
-  const deleteRes = await fetch(`${apiUrl}/api/user/${encoded}`, {
+  const deleteRes = await marzbanFetch(`/api/user/${encoded}`, {
     method: "DELETE",
     headers: authHeaders,
-    cache: "no-store",
   });
   if (!deleteRes.ok) {
     const errText = await deleteRes.text();
@@ -212,7 +212,7 @@ export async function provisionTrialMarzbanUser(
     note: "24-Hour Stealth Trial · 1GB",
   };
 
-  const userRes = await fetch(`${apiUrl}/api/user`, {
+  const userRes = await marzbanFetch("/api/user", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -220,7 +220,6 @@ export async function provisionTrialMarzbanUser(
       Accept: "application/json",
     },
     body: JSON.stringify(payload),
-    cache: "no-store",
   });
 
   if (!userRes.ok) {
@@ -282,7 +281,7 @@ export async function provisionManualMarzbanUser(params: {
     note: `VIP Manual · ${planName}`,
   };
 
-  const userRes = await fetch(`${apiUrl}/api/user`, {
+  const userRes = await marzbanFetch("/api/user", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -290,7 +289,6 @@ export async function provisionManualMarzbanUser(params: {
       Accept: "application/json",
     },
     body: JSON.stringify(payload),
-    cache: "no-store",
   });
 
   if (!userRes.ok) {
@@ -347,7 +345,7 @@ export async function provisionMarzbanUser(
     note: `Plan: ${planName}`,
   };
 
-  const userRes = await fetch(`${apiUrl}/api/user`, {
+  const userRes = await marzbanFetch("/api/user", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -355,7 +353,6 @@ export async function provisionMarzbanUser(
       Accept: "application/json",
     },
     body: JSON.stringify(payload),
-    cache: "no-store",
   });
 
   if (!userRes.ok) {
@@ -389,12 +386,11 @@ export async function renewMarzbanUser(
   const { apiUrl, token } = await getMarzbanAdminToken();
   const encoded = encodeURIComponent(targetUsername);
 
-  const getRes = await fetch(`${apiUrl}/api/user/${encoded}`, {
+  const getRes = await marzbanFetch(`/api/user/${encoded}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
     },
-    cache: "no-store",
   });
 
   if (!getRes.ok) {
@@ -418,7 +414,7 @@ export async function renewMarzbanUser(
   expireDate.setMonth(expireDate.getMonth() + planToExpireMonths(planName));
   const newExpire = Math.floor(expireDate.getTime() / 1000);
 
-  const putRes = await fetch(`${apiUrl}/api/user/${encoded}`, {
+  const putRes = await marzbanFetch(`/api/user/${encoded}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -429,7 +425,6 @@ export async function renewMarzbanUser(
       expire: newExpire,
       status: "active",
     }),
-    cache: "no-store",
   });
 
   if (!putRes.ok) {
@@ -474,10 +469,9 @@ export async function revokeAndRefreshMarzbanSubscription(
     Accept: "application/json",
   };
 
-  const revokeRes = await fetch(`${apiUrl}/api/user/${encoded}/revoke_sub`, {
+  const revokeRes = await marzbanFetch(`/api/user/${encoded}/revoke_sub`, {
     method: "POST",
     headers: authHeaders,
-    cache: "no-store",
   });
 
   if (!revokeRes.ok) {
@@ -488,9 +482,8 @@ export async function revokeAndRefreshMarzbanSubscription(
     );
   }
 
-  const getRes = await fetch(`${apiUrl}/api/user/${encoded}`, {
+  const getRes = await marzbanFetch(`/api/user/${encoded}`, {
     headers: authHeaders,
-    cache: "no-store",
   });
 
   if (!getRes.ok) {
@@ -519,15 +512,14 @@ export async function fetchMarzbanUser(
   targetUsername: string,
 ): Promise<MarzbanUserStats | null> {
   try {
-    const { apiUrl, token } = await getMarzbanAdminToken();
-    const res = await fetch(
-      `${apiUrl}/api/user/${encodeURIComponent(targetUsername)}`,
+    const { token } = await getMarzbanAdminToken();
+    const res = await marzbanFetch(
+      `/api/user/${encodeURIComponent(targetUsername)}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
         },
-        cache: "no-store",
       },
     );
     if (!res.ok) return null;

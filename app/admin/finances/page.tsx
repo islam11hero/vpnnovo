@@ -3,7 +3,8 @@ import { AlertCircle, Clock, DollarSign, Wallet } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { supabaseAdmin, type SupabaseOrder } from "@/lib/supabase";
+import { getSupabaseAdminResult } from "@/lib/supabase/admin";
+import type { SupabaseOrder } from "@/lib/supabase/types";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -51,7 +52,8 @@ function StatusBadge({ status }: { status: SupabaseOrder["status"] }) {
 }
 
 export default async function AdminFinancesPage() {
-  if (!supabaseAdmin) {
+  const db = getSupabaseAdminResult();
+  if (!db.ok) {
     return (
       <div className="mx-auto max-w-7xl space-y-8">
         <AdminPageHeader
@@ -66,7 +68,7 @@ export default async function AdminFinancesPage() {
     );
   }
 
-  const { data: orders, error } = await supabaseAdmin
+  const { data: orders, error } = await db.client
     .from("orders")
     .select("*")
     .order("created_at", { ascending: false });

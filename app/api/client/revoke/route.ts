@@ -2,18 +2,16 @@ import { NextResponse } from "next/server";
 
 import { MarzbanError, revokeAndRefreshMarzbanSubscription } from "@/lib/marzban";
 import { isValidUuid } from "@/lib/uuid";
-import { supabaseAdmin } from "@/lib/supabase";
+import { jsonError } from "@/lib/api/json-error";
+import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function jsonError(message: string, status: number) {
-  return NextResponse.json({ success: false, error: message }, { status });
-}
-
 export async function POST(request: Request) {
-  if (!supabaseAdmin) {
-    return jsonError("Database not configured", 500);
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
   }
 
   let body: unknown;
@@ -35,7 +33,7 @@ export async function POST(request: Request) {
     return jsonError("Invalid or missing order_id", 400);
   }
 
-  const { data: order, error: fetchError } = await supabaseAdmin
+  const { data: order, error: fetchError } = await db.client
     .from("orders")
     .select("id, status, vpn_username")
     .eq("id", order_id)
@@ -57,7 +55,7 @@ export async function POST(request: Request) {
   try {
     const new_link = await revokeAndRefreshMarzbanSubscription(vpnUsername);
 
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await db.client
       .from("orders")
       .update({ vpn_sub_link: new_link })
       .eq("id", order_id);

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { MarzbanError, provisionManualMarzbanUser } from "@/lib/marzban";
 import { isAdminAuthenticated, unauthorizedAdminResponse } from "@/lib/require-admin";
-import { supabaseAdmin } from "@/lib/supabase";
+import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
 export const runtime = "nodejs";
 
@@ -15,8 +15,9 @@ export async function POST(request: Request) {
     return unauthorizedAdminResponse();
   }
 
-  if (!supabaseAdmin) {
-    return jsonError("Supabase admin client is not configured", 500);
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
   }
 
   let body: unknown;
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
       dataLimitGb: data_limit_gb,
     });
 
-    const { data: order, error: insertError } = await supabaseAdmin
+    const { data: order, error: insertError } = await db.client
       .from("orders")
       .insert({
         plan_name,

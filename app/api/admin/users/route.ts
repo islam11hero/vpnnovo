@@ -1,34 +1,38 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+
+import { getMarzbanAdminToken, MarzbanError } from "@/lib/marzban";
+import { marzbanFetch } from "@/lib/marzban-http";
+import { isAdminAuthenticated, unauthorizedAdminResponse } from "@/lib/require-admin";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (!isAdminAuthenticated()) {
+    return unauthorizedAdminResponse();
+  }
+
   try {
-    const apiUrl = process.env.MARZBAN_API_URL;
-    const username = process.env.MARZBAN_USERNAME;
-    const password = process.env.MARZBAN_PASSWORD;
+    const { token } = await getMarzbanAdminToken();
 
-    if (!apiUrl || !username || !password) return NextResponse.json({ error: 'Missing .env credentials' }, { status: 500 });
-
-    const tokenRes = await fetch(`${apiUrl}/api/admin/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-      body: new URLSearchParams({ username, password, grant_type: 'password' }),
-      cache: 'no-store'
+    const usersRes = await marzbanFetch("/api/users", {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     });
-    
-    if (!tokenRes.ok) return NextResponse.json({ error: 'Invalid auth' }, { status: 401 });
-    const token = (await tokenRes.json()).access_token;
 
-    const usersRes = await fetch(`${apiUrl}/api/users`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
-    
-    if (!usersRes.ok) return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+    if (!usersRes.ok) {
+      return NextResponse.json(
+        { error: "Failed to fetch users" },
+        { status: 500 },
+      );
+    }
 
     const usersData = await usersRes.json();
     return NextResponse.json({ success: true, users: usersData });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    if (error instanceof MarzbanError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    const message = error instanceof Error ? error.message : "Unknown server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,22 +1,25 @@
 import { NextResponse } from "next/server";
 
 import { buildRevenueChartData } from "@/lib/revenue-chart";
-import { supabaseAdmin } from "@/lib/supabase";
+import { isAdminAuthenticated, unauthorizedAdminResponse } from "@/lib/require-admin";
+import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!supabaseAdmin) {
-    return NextResponse.json(
-      { success: false, error: "Supabase not configured" },
-      { status: 500 },
-    );
+  if (!isAdminAuthenticated()) {
+    return unauthorizedAdminResponse();
+  }
+
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
   }
 
   const since = new Date();
   since.setDate(since.getDate() - 7);
 
-  const { data: orders, error } = await supabaseAdmin
+  const { data: orders, error } = await db.client
     .from("orders")
     .select("amount, created_at")
     .eq("status", "paid")

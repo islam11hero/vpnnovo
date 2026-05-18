@@ -6,13 +6,11 @@ import { Loader2, RefreshCw } from "lucide-react";
 type Props = {
   parentOrderId: string;
   planName: string;
-  amount: number;
 };
 
 export function RenewSubscriptionButton({
   parentOrderId,
   planName,
-  amount,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +26,7 @@ export function RenewSubscriptionButton({
         body: JSON.stringify({
           order_id: parentOrderId,
           planName,
-          amount,
+          billing: "monthly",
         }),
       });
       const data = (await res.json()) as {

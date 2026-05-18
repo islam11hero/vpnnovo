@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   CheckCircle2,
   Loader2,
-  AlertCircle,
   AlertTriangle,
   KeyRound,
   MapPin,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { CopyButton } from "@/components/CopyButton";
+import { CheckoutToast } from "@/components/ui/checkout-toast";
 import { generateTrialDeviceHash } from "@/lib/trial-device-hash";
 
 type PaymentPending = {
@@ -63,7 +63,7 @@ export function PricingSection() {
 
   const isBusy = phase !== "idle" || isTrialLoading;
 
-  const handleCheckout = async (amount: number, planName: string) => {
+  const handleCheckout = async (planName: string) => {
     setActivePlan(planName);
     setPhase("processing");
     setErrorMsg(null);
@@ -72,7 +72,10 @@ export function PricingSection() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planName, amount }),
+        body: JSON.stringify({
+          planName,
+          billing: isAnnual ? "annual" : "monthly",
+        }),
       });
       const data = (await res.json()) as {
         success?: boolean;
@@ -85,11 +88,16 @@ export function PricingSection() {
           order_id: data.order_id,
           payment_url: data.payment_url,
         });
+      } else if (res.status === 503) {
+        setErrorMsg(
+          data.error ||
+            "Billing is temporarily unavailable. Confirm Supabase env vars on Vercel, then redeploy.",
+        );
       } else {
         setErrorMsg(data.error || "Checkout failed. Please try again.");
       }
     } catch {
-      setErrorMsg("Server connection failed.");
+      setErrorMsg("Server connection failed. Check your network and try again.");
     } finally {
       setPhase("idle");
       setActivePlan(null);
@@ -122,11 +130,16 @@ export function PricingSection() {
 
       if (data.success && data.order_id) {
         setTrialOrderId(data.order_id);
+      } else if (res.status === 503) {
+        setErrorMsg(
+          data.error ||
+            "Billing is temporarily unavailable. Confirm Supabase env vars on Vercel, then redeploy.",
+        );
       } else {
         setErrorMsg(data.error || "Trial activation failed. Please try again.");
       }
     } catch {
-      setErrorMsg("Server connection failed.");
+      setErrorMsg("Server connection failed. Check your network and try again.");
     } finally {
       setIsTrialLoading(false);
     }
@@ -301,12 +314,11 @@ export function PricingSection() {
           </div>
         </div>
 
-        {errorMsg && (
-          <div className="mx-auto mb-8 flex max-w-2xl items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-600 shadow-sm">
-            <AlertCircle className="h-5 w-5 shrink-0" />
-            <p className="text-sm font-bold">{errorMsg}</p>
-          </div>
-        )}
+        <CheckoutToast
+          message={errorMsg}
+          variant="error"
+          onDismiss={() => setErrorMsg(null)}
+        />
 
         {trialOrderId ? (
           <div className="mx-auto max-w-2xl rounded-[3rem] border-2 border-amber-300 bg-white p-8 text-center shadow-2xl md:p-14">
@@ -437,7 +449,7 @@ export function PricingSection() {
                 </ul>
                 <button
                   type="button"
-                  onClick={() => handleCheckout(plan.price, plan.name)}
+                  onClick={() => handleCheckout(plan.name)}
                   disabled={isBusy}
                   className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 font-bold transition-all disabled:cursor-not-allowed disabled:opacity-70 ${
                     plan.popular

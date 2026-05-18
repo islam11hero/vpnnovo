@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { jsonError } from "@/lib/api/json-error";
 import { MarzbanError, provisionTrialMarzbanUser } from "@/lib/marzban";
-import { supabaseAdmin } from "@/lib/supabase";
+import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 import {
-  extractClientIp,
   hasTrialAbuseRecord,
   normalizeDeviceHash,
   recordTrialClaim,
@@ -16,15 +16,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const TRIAL_PLAN_NAME = "24-Hour Stealth Trial";
-const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30 days
-
-function jsonError(
-  message: string,
-  status: number,
-  extra?: Record<string, unknown>,
-) {
-  return NextResponse.json({ success: false, error: message, ...extra }, { status });
-}
+const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 function fraudResponse() {
   return jsonError(TRIAL_FRAUD_MESSAGE, 429, { fraud: true });
@@ -53,7 +45,15 @@ export async function POST(request: Request) {
     return jsonError("Missing or invalid device fingerprint", 400);
   }
 
-  const ipAddress = extractClientIp(request);
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
+  }
+
+  const ipAddress =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip")?.trim() ??
+    "unknown";
 
   try {
     const blocked = await hasTrialAbuseRecord(ipAddress, deviceHash);
@@ -65,11 +65,7 @@ export async function POST(request: Request) {
     return jsonError("Trial security check unavailable. Try again later.", 503);
   }
 
-  if (!supabaseAdmin) {
-    return jsonError("Supabase admin client is not configured", 500);
-  }
-
-  const { data: order, error: insertError } = await supabaseAdmin
+  const { data: order, error: insertError } = await db.client
     .from("orders")
     .insert({
       plan_name: TRIAL_PLAN_NAME,
@@ -81,10 +77,7 @@ export async function POST(request: Request) {
     .single();
 
   if (insertError || !order?.id) {
-    return jsonError(
-      insertError?.message ?? "Failed to create trial order in Supabase",
-      500,
-    );
+    return jsonError("Could not create trial. Please try again.", 500);
   }
 
   const orderId = order.id as string;
@@ -92,7 +85,7 @@ export async function POST(request: Request) {
   try {
     const { username, sub_link } = await provisionTrialMarzbanUser(orderId);
 
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await db.client
       .from("orders")
       .update({
         vpn_username: username,
@@ -120,7 +113,7 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (e) {
-    await supabaseAdmin
+    await db.client
       .from("orders")
       .update({ status: "failed" })
       .eq("id", orderId);

@@ -30,7 +30,7 @@ import {
   formatPortalExpiry,
   usagePercent,
 } from "@/lib/portal-format";
-import type { SupabaseOrder } from "@/lib/supabase";
+import type { SupabaseOrder } from "@/lib/supabase/types";
 
 type TabId =
   | "overview"
@@ -364,7 +364,6 @@ export function ClientDashboard({ order, marzbanUser }: Props) {
                     <RenewSubscriptionButton
                       parentOrderId={order.id}
                       planName={order.plan_name}
-                      amount={Number(order.amount)}
                     />
                   ) : (
                     <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">

@@ -1,4 +1,4 @@
-import type { SupabaseOrder } from "@/lib/supabase";
+import type { SupabaseOrder } from "@/lib/supabase/types";
 
 export type RevenueChartPoint = { name: string; revenue: number };
 

@@ -9,7 +9,8 @@ import { ClientDashboard } from "@/components/portal/ClientDashboard";
 import { RefreshButton } from "@/components/portal/RefreshButton";
 import { fetchMarzbanUser } from "@/lib/marzban";
 import { isValidUuid } from "@/lib/uuid";
-import { supabaseAdmin, type SupabaseOrder } from "@/lib/supabase";
+import { getSupabaseAdminResult } from "@/lib/supabase/admin";
+import type { SupabaseOrder } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
@@ -130,17 +131,19 @@ export default async function PortalDashboardPage({ params }: Props) {
     return <InvalidOrderId />;
   }
 
-  if (!supabaseAdmin) {
+  const db = getSupabaseAdminResult();
+  if (!db.ok) {
     return (
       <div className="mx-auto max-w-lg pt-8 text-center">
         <p className="text-sm font-medium text-slate-500">
-          Portal is temporarily unavailable. Please try again later.
+          Portal is temporarily unavailable. Billing database is not configured on
+          the server.
         </p>
       </div>
     );
   }
 
-  const { data: order, error } = await supabaseAdmin
+  const { data: order, error } = await db.client
     .from("orders")
     .select("*")
     .eq("id", orderId)
