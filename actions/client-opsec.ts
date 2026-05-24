@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { actionErr, actionOk, type ActionResult } from "@/lib/actions-result";
+import { assertOrderAccess } from "@/lib/order-access";
 import { MarzbanError } from "@/lib/marzban";
 import { zeroTraceSessionWipe } from "@/lib/marzban/opsec-wipe";
 import { resolveMarzbanUsername } from "@/lib/orders";
@@ -25,7 +26,7 @@ export async function zeroTraceSessionWipeAction(
 
   const { data: order, error } = await db.client
     .from("orders")
-    .select("id, status, vpn_username, marzban_username, vpn_sub_link")
+    .select("id, status, user_id, vpn_username, marzban_username, vpn_sub_link")
     .eq("id", id)
     .maybeSingle();
 
@@ -34,6 +35,10 @@ export async function zeroTraceSessionWipeAction(
   }
 
   const row = order as SupabaseOrder;
+  const access = await assertOrderAccess(id);
+  if (!access.ok) {
+    return actionErr(access.error);
+  }
   if (row.status !== "paid") {
     return actionErr("Only active paid shields can run a zero-trace wipe.");
   }
@@ -55,6 +60,7 @@ export async function zeroTraceSessionWipeAction(
       return actionErr(updateError.message);
     }
 
+    revalidatePath("/dashboard");
     revalidatePath(`/dashboard/${id}`);
     revalidatePath(`/portal/${id}`);
 

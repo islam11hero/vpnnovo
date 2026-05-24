@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAdminAuthenticated, unauthorizedAdminResponse } from "@/lib/require-admin";
-import { prisma } from "@/lib/prisma";
+import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 import { isValidUuid } from "@/lib/uuid";
 
 export const runtime = "nodejs";
@@ -20,9 +20,20 @@ export async function GET(
     return NextResponse.json({ error: "Invalid order id" }, { status: 400 });
   }
 
-  const order = await prisma.order.findUnique({
-    where: { id },
-  });
+  const db = requireSupabaseAdmin();
+  if (!db.ok) {
+    return db.response;
+  }
+
+  const { data: order, error } = await db.client
+    .from("orders")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   if (!order) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });

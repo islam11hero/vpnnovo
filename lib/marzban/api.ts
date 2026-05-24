@@ -1,7 +1,7 @@
 import "server-only";
 
-import { getMarzbanAdminToken, MarzbanError } from "@/lib/marzban";
-import { marzbanFetch } from "@/lib/marzban-http";
+import { MarzbanError } from "@/lib/marzban-error";
+import { marzbanFetchOrThrow } from "@/lib/marzban-client";
 
 export type MarzbanUserTelemetry = {
   username: string;
@@ -28,15 +28,8 @@ export async function fetchMarzbanUserTelemetry(
   }
 
   try {
-    const { token } = await getMarzbanAdminToken();
-    const res = await marzbanFetch(
+    const res = await marzbanFetchOrThrow(
       `/api/user/${encodeURIComponent(trimmed)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      },
     );
 
     if (!res.ok) {

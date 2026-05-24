@@ -1,37 +1,32 @@
 import { ClientCommandTable } from "@/components/admin/clients/client-command-table";
 import { ClientMetricsStrip } from "@/components/admin/clients/client-metrics-strip";
+import { TelemetryDelayedBadge } from "@/components/admin/clients/telemetry-delayed-badge";
+import type { AdminClientsTelemetryPayload } from "@/lib/admin-clients-loader";
 import { computeClientGridMetrics } from "@/lib/marzban-client-metrics";
-import { fetchAllMarzbanUsers } from "@/lib/marzban/users-bulk";
 
-export async function ClientCommandPanel() {
-  const result = await fetchAllMarzbanUsers();
+type Props = {
+  payload: AdminClientsTelemetryPayload;
+};
 
-  if (!result.ok) {
-    return (
-      <div className="space-y-6">
-        <ClientMetricsStrip
-          metrics={{
-            totalProvisioned: 0,
-            expiringSoon: 0,
-            suspended: 0,
-          }}
-          marzbanOnline={false}
-          error={result.error}
-        />
-        <ClientCommandTable users={[]} />
-      </div>
-    );
-  }
-
-  const users = [...result.users].sort((a, b) =>
-    a.username.localeCompare(b.username),
-  );
-  const metrics = computeClientGridMetrics(users);
+export function ClientCommandPanel({ payload }: Props) {
+  const metrics = computeClientGridMetrics(payload.rows);
 
   return (
     <div className="space-y-6">
-      <ClientMetricsStrip metrics={metrics} marzbanOnline />
-      <ClientCommandTable users={users} />
+      {payload.telemetryDelayed ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <TelemetryDelayedBadge />
+          {payload.error ? (
+            <span className="text-xs text-slate-500">{payload.error}</span>
+          ) : null}
+        </div>
+      ) : null}
+      <ClientMetricsStrip
+        metrics={metrics}
+        marzbanOnline={payload.marzbanOnline}
+        error={payload.error}
+      />
+      <ClientCommandTable rows={payload.rows} />
     </div>
   );
 }

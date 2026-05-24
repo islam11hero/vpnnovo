@@ -1,17 +1,17 @@
 import { Suspense } from "react";
 
-import { ClientCommandPanel } from "@/components/admin/clients/client-command-panel";
-import { ClientsPageHeader } from "@/components/admin/clients/clients-page-header";
-import { ClientsPageSkeleton } from "@/components/admin/clients/clients-page-skeleton";
+import { ClientShellWithOrders } from "@/components/admin/clients/client-shell";
+import { ClientTelemetrySection } from "@/components/admin/clients/client-telemetry-section";
+import { ClientsTelemetrySkeleton } from "@/components/admin/clients/clients-telemetry-skeleton";
 
 export const dynamic = "force-dynamic";
 
 export default function AdminClientsPage() {
   return (
     <div className="mx-auto max-w-[1600px] space-y-8">
-      <ClientsPageHeader />
-      <Suspense fallback={<ClientsPageSkeleton />}>
-        <ClientCommandPanel />
+      <ClientShellWithOrders />
+      <Suspense fallback={<ClientsTelemetrySkeleton />}>
+        <ClientTelemetrySection />
       </Suspense>
     </div>
   );

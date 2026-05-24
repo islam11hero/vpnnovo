@@ -6,7 +6,6 @@ import { NocEmptyState } from "@/components/admin/noc/noc-empty-state";
 import { formatUsd, netProfitValueClass } from "@/lib/format-currency";
 import {
   computeMrrFromPaidOrders,
-  loadVultrPendingCharges,
 } from "@/lib/noc-live-metrics";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
 import type { SupabaseOrder } from "@/lib/supabase/types";
@@ -78,8 +77,7 @@ export default async function AdminFinancesPage() {
 
   const paidOrders = rows.filter((o) => o.status === "paid");
   const mrr = computeMrrFromPaidOrders(paidOrders);
-  const vultrBilling = await loadVultrPendingCharges();
-  const netProfit = mrr - (vultrBilling.online ? vultrBilling.pending : 0);
+  const netProfit = mrr;
 
   const totalRevenue = paidOrders.reduce(
     (sum, o) => sum + Number(o.amount),
@@ -97,9 +95,8 @@ export default async function AdminFinancesPage() {
           Revenue & Transactions
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Live Supabase ledger · Vultr pending charges
+          Live Supabase ledger · Marzban provisioning
           {!supabaseOnline ? " · Supabase offline" : ""}
-          {!vultrBilling.online ? " · Vultr offline" : ""}
         </p>
       </div>
 
@@ -108,7 +105,7 @@ export default async function AdminFinancesPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] font-bold tracking-widest text-slate-500 uppercase">
-                Net Profit (MRR − Vultr)
+                Net Revenue (MRR)
               </p>
               <h3
                 className={`mt-2 text-3xl font-black tabular-nums ${netProfitValueClass(netProfit)}`}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { assertOrderAccess } from "@/lib/order-access";
 import { isValidUuid } from "@/lib/uuid";
 import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
@@ -23,14 +24,9 @@ export async function GET(request: Request) {
     return jsonError("Invalid or missing order_id", 400);
   }
 
-  const { data: order } = await db.client
-    .from("orders")
-    .select("id")
-    .eq("id", orderId)
-    .maybeSingle();
-
-  if (!order) {
-    return jsonError("Order not found", 404);
+  const access = await assertOrderAccess(orderId);
+  if (!access.ok) {
+    return jsonError(access.error, access.status);
   }
 
   const { data: tickets, error } = await db.client
@@ -95,6 +91,11 @@ export async function POST(request: Request) {
     return jsonError("Message must be between 10 and 5000 characters", 400);
   }
 
+  const access = await assertOrderAccess(order_id);
+  if (!access.ok) {
+    return jsonError(access.error, access.status);
+  }
+
   const { data: order } = await db.client
     .from("orders")
     .select("id, status")
@@ -103,6 +104,10 @@ export async function POST(request: Request) {
 
   if (!order) {
     return jsonError("Order not found", 404);
+  }
+
+  if (order.status !== "paid") {
+    return jsonError("Only active paid nodes can open support tickets", 400);
   }
 
   const { data: ticket, error } = await db.client

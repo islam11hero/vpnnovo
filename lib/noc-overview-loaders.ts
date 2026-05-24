@@ -95,6 +95,7 @@ export async function loadNocFinancialBlock(): Promise<{
     orders.supabaseOnline,
     vultrBilling.online,
     vultrBilling.error,
+    vultrBilling.configured,
   );
 
   const bandwidth = buildBandwidthMetrics(
@@ -104,6 +105,7 @@ export async function loadNocFinancialBlock(): Promise<{
     fleet.vultr.online,
     marzbanUsers.ok ? undefined : marzbanUsers.error,
     fleet.vultr.error,
+    fleet.vultr.configured !== false,
   );
 
   return { financial, bandwidth };

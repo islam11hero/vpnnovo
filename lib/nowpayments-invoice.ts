@@ -26,7 +26,7 @@ export async function createNowPaymentsInvoice(params: {
       price_currency: "usd",
       order_id: params.orderId,
       order_description: description,
-      ipn_callback_url: `${siteUrl}/api/webhook/nowpay`,
+      ipn_callback_url: `${siteUrl}/api/webhooks/nowpayments`,
       success_url: `${siteUrl}/portal/${params.orderId}`,
       cancel_url: `${siteUrl}/`,
     }),

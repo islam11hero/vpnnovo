@@ -5,6 +5,7 @@ import { resolveAdminRedirectPath } from "@/lib/admin-access";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth-constants";
 import { isValidAdminSessionEdge } from "@/lib/admin-session-edge";
 import { enforceTrialEdgeRateLimit } from "@/lib/edge/trial-rate-limit";
+import { updateSupabaseSession } from "@/lib/supabase/middleware";
 
 async function handleAdmin(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
@@ -42,9 +43,23 @@ export async function middleware(request: NextRequest) {
     return handleAdmin(request);
   }
 
+  if (
+    request.nextUrl.pathname.startsWith("/dashboard") ||
+    request.nextUrl.pathname === "/login"
+  ) {
+    return updateSupabaseSession(request);
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin", "/admin/:path*", "/api/checkout/trial"],
+  matcher: [
+    "/admin",
+    "/admin/:path*",
+    "/api/checkout/trial",
+    "/dashboard",
+    "/dashboard/:path*",
+    "/login",
+  ],
 };

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Building, Mail, Shield } from "lucide-react";
 
 const SOLUTIONS = [
+  { label: "GCC Pricing", href: "/gcc" },
+  { label: "China Pricing", href: "/china" },
   { label: "Ad Verification", href: "/#use-cases" },
   { label: "Brand Protection", href: "/#use-cases" },
   { label: "Remote Workforce ZTNA", href: "/#use-cases" },

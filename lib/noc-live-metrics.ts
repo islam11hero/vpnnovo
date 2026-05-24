@@ -14,6 +14,7 @@ import type { SupabaseOrder } from "@/lib/supabase/types";
 import {
   fetchPrimaryVultrInstance,
   fetchVultrAccount,
+  isVultrEnabled,
   type VultrInstance,
 } from "@/lib/vultr";
 
@@ -41,6 +42,7 @@ export function buildFinancialMetrics(
   supabaseOnline: boolean,
   vultrOnline: boolean,
   vultrError?: string,
+  vultrConfigured = isVultrEnabled(),
 ): NocFinancialMetrics {
   const mrr = computeMrrFromPaidOrders(paidOrders);
   const totalPaidRevenue = paidOrders.reduce(
@@ -57,7 +59,7 @@ export function buildFinancialMetrics(
     totalPaidRevenue: Number(totalPaidRevenue.toFixed(2)),
     paidOrderCount: paidOrders.length,
     supabase: { online: supabaseOnline },
-    vultr: { online: vultrOnline, error: vultrError },
+    vultr: { online: vultrOnline, error: vultrError, configured: vultrConfigured },
   };
 }
 
@@ -68,6 +70,7 @@ export function buildBandwidthMetrics(
   vultrOnline: boolean,
   marzbanError?: string,
   vultrError?: string,
+  vultrConfigured = isVultrEnabled(),
 ): NocBandwidthMetrics {
   const allowedBytes = vultrAllowedGb > 0 ? vultrAllowedGb * 1024 ** 3 : 0;
   const burnPercent =
@@ -80,7 +83,7 @@ export function buildBandwidthMetrics(
     vultrAllowedGb: vultrOnline ? vultrAllowedGb : 0,
     burnPercent: marzbanOnline && vultrOnline ? burnPercent : 0,
     marzban: { online: marzbanOnline, error: marzbanError },
-    vultr: { online: vultrOnline, error: vultrError },
+    vultr: { online: vultrOnline, error: vultrError, configured: vultrConfigured },
   };
 }
 
@@ -103,31 +106,42 @@ export function mapVultrInstance(
 }
 
 export async function loadFleetMetrics(): Promise<NocFleetMetrics> {
+  if (!isVultrEnabled()) {
+    return {
+      instance: null,
+      vultr: { online: false, configured: false },
+    };
+  }
   const instanceRes = await fetchPrimaryVultrInstance();
   if (!instanceRes.ok) {
     return {
       instance: null,
-      vultr: { online: false, error: instanceRes.error },
+      vultr: { online: false, configured: true, error: instanceRes.error },
     };
   }
   return {
     instance: mapVultrInstance(instanceRes.data),
-    vultr: { online: true },
+    vultr: { online: true, configured: true },
   };
 }
 
 export async function loadVultrPendingCharges(): Promise<{
   pending: number;
   online: boolean;
+  configured: boolean;
   error?: string;
 }> {
+  if (!isVultrEnabled()) {
+    return { pending: 0, online: false, configured: false };
+  }
   const account = await fetchVultrAccount();
   if (!account.ok) {
-    return { pending: 0, online: false, error: account.error };
+    return { pending: 0, online: false, configured: true, error: account.error };
   }
   return {
     pending: account.data.pending_charges,
     online: true,
+    configured: true,
   };
 }
 

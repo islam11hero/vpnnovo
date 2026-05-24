@@ -7,9 +7,8 @@ import {
 
 import { ClientDashboard } from "@/components/portal/ClientDashboard";
 import { RefreshButton } from "@/components/portal/RefreshButton";
-import { fetchMarzbanUser } from "@/lib/marzban";
-import { resolveMarzbanUsername } from "@/lib/orders";
-import { loadPortalActiveOrders } from "@/lib/portal-orders";
+import { loadOrderDashboardPayload } from "@/lib/client-dashboard-loader";
+import { setPortalOrderCookie } from "@/lib/order-access";
 import { isValidUuid } from "@/lib/uuid";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
 import { getSystemConfigFlags } from "@/lib/system-config";
@@ -205,16 +204,12 @@ export default async function PortalDashboardPage({ params }: Props) {
   }
 
   if (row.status === "paid") {
-    const marzbanUsername = resolveMarzbanUsername(row);
-    const [marzbanUser, activeOrders] = await Promise.all([
-      marzbanUsername ? fetchMarzbanUser(marzbanUsername) : Promise.resolve(null),
-      loadPortalActiveOrders(orderId),
-    ]);
+    setPortalOrderCookie(orderId);
+    const payload = await loadOrderDashboardPayload(row);
     return (
       <ClientDashboard
-        order={row}
-        marzbanUser={marzbanUser}
-        activeOrders={activeOrders}
+        {...payload}
+        showFinancialHub={false}
       />
     );
   }

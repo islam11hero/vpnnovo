@@ -3,13 +3,11 @@ import "server-only";
 import { randomUUID } from "crypto";
 
 import {
-  getMarzbanAdminToken,
-  MARZBAN_INBOUNDS,
   MARZBAN_PROXIES,
-  MarzbanError,
   revokeAndRefreshMarzbanSubscription,
 } from "@/lib/marzban";
-import { marzbanFetch } from "@/lib/marzban-http";
+import { MarzbanError } from "@/lib/marzban-error";
+import { marzbanFetchOrThrow } from "@/lib/marzban-client";
 
 /**
  * Zero-trace wipe: reset usage, rotate VLESS UUID, revoke subscription token.
@@ -18,16 +16,10 @@ import { marzbanFetch } from "@/lib/marzban-http";
 export async function zeroTraceSessionWipe(
   targetUsername: string,
 ): Promise<string> {
-  const { token } = await getMarzbanAdminToken();
   const encoded = encodeURIComponent(targetUsername);
-  const authHeaders = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-  };
 
-  const resetRes = await marzbanFetch(`/api/user/${encoded}/reset`, {
+  const resetRes = await marzbanFetchOrThrow(`/api/user/${encoded}/reset`, {
     method: "POST",
-    headers: authHeaders,
   });
   if (!resetRes.ok) {
     const errText = await resetRes.text();
@@ -44,17 +36,12 @@ export async function zeroTraceSessionWipe(
     },
   };
 
-  const putRes = await marzbanFetch(`/api/user/${encoded}`, {
+  const putRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
     method: "PUT",
-    headers: {
-      ...authHeaders,
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       proxies: newProxies,
-      inbounds: MARZBAN_INBOUNDS,
       status: "active",
-      note: `OPSEC zero-trace wipe · ${new Date().toISOString()}`,
     }),
   });
 

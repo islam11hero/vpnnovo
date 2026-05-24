@@ -70,16 +70,16 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 to-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 to-slate-950/60 p-6 shadow-sm">
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100">
-            <Shield className="h-6 w-6 text-emerald-600" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10">
+            <Shield className="h-6 w-6 text-emerald-400" />
           </div>
           <div>
-            <h3 className="font-poppins text-lg font-bold text-slate-900">
+            <h3 className="font-poppins text-lg font-bold text-white">
               Zero-Knowledge Support
             </h3>
-            <p className="mt-1 text-sm font-medium text-slate-600">
+            <p className="mt-1 text-sm font-medium text-slate-400">
               No email required. Pick the VPN node you need help with — we only
               see your Order ID and technical context.
             </p>
@@ -89,11 +89,11 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
 
       <form
         onSubmit={handleSubmit}
-        className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
+        className="rounded-2xl border border-slate-800 bg-slate-950/60 p-6 shadow-sm md:p-8"
       >
         <div className="mb-5 flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-[#3B82F6]" />
-          <h3 className="font-poppins text-lg font-bold text-slate-900">
+          <MessageSquare className="h-5 w-5 text-cyan-400" />
+          <h3 className="font-poppins text-lg font-bold text-white">
             Create New Ticket
           </h3>
         </div>
@@ -107,7 +107,7 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
             value={selectedOrderId}
             onChange={(e) => setSelectedOrderId(e.target.value)}
             required
-            className="mb-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 focus:border-[#3B82F6]/50 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20"
+            className="mb-4 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-medium text-white focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
           >
             {activeOrders.map((node) => (
               <option key={node.id} value={node.id}>
@@ -116,7 +116,7 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
             ))}
           </select>
         ) : (
-          <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-sm font-bold text-slate-800">
+          <div className="mb-4 rounded-xl border border-cyan-500/20 bg-cyan-950/30 px-4 py-3 text-sm font-bold text-cyan-100">
             {activeOrders[0]?.label ?? defaultOrderId}
           </div>
         )}
@@ -127,7 +127,7 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
         <select
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          className="mb-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 focus:border-[#3B82F6]/50 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20"
+          className="mb-4 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-medium text-white focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
         >
           {TICKET_SUBJECTS.map((s) => (
             <option key={s} value={s}>
@@ -146,27 +146,27 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
           minLength={10}
           rows={5}
           placeholder="Describe your issue. Include app names (v2rayNG, AdsPower) if relevant."
-          className="mb-4 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#3B82F6]/50 focus:outline-none focus:ring-2 focus:ring-[#3B82F6]/20"
+          className="mb-4 w-full resize-none rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-medium text-white placeholder:text-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
         />
 
         <button
           type="submit"
           disabled={isPending || !selectedOrderId}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3B82F6] py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-cyan-900/30 transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Submit Anonymous Ticket
         </button>
       </form>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-6 shadow-sm md:p-8">
         <div className="mb-5 flex items-center gap-2">
-          <Headphones className="h-5 w-5 text-[#3B82F6]" />
-          <h3 className="font-poppins text-lg font-bold text-slate-900">
+          <Headphones className="h-5 w-5 text-cyan-400" />
+          <h3 className="font-poppins text-lg font-bold text-white">
             Your Tickets
           </h3>
           {hasMultipleNodes ? (
-            <span className="ml-auto text-xs font-medium text-slate-400">
+            <span className="ml-auto text-xs font-medium text-slate-500">
               Node: {selectedOrderId.slice(0, 8)}…
             </span>
           ) : null}
@@ -174,7 +174,7 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
 
         {loading ? (
           <div className="flex justify-center py-10">
-            <Loader2 className="h-8 w-8 animate-spin text-[#3B82F6]" />
+            <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
           </div>
         ) : tickets.length === 0 ? (
           <p className="text-sm font-medium text-slate-500">
@@ -185,15 +185,15 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
             {tickets.map((ticket) => (
               <li
                 key={ticket.id}
-                className="rounded-xl border border-slate-100 bg-slate-50/50 p-5"
+                className="rounded-xl border border-slate-800 bg-slate-900/50 p-5"
               >
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-bold text-slate-900">{ticket.subject}</p>
+                  <p className="font-bold text-white">{ticket.subject}</p>
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${
                       ticket.status === "closed" || ticket.status === "resolved"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-amber-100 text-amber-800"
+                        ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                        : "border border-amber-500/40 bg-amber-500/10 text-amber-300"
                     }`}
                   >
                     {ticket.status}
@@ -202,14 +202,14 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
 
                 <div className="space-y-3">
                   <div className="flex justify-end">
-                    <div className="max-w-[92%] rounded-2xl rounded-br-md bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200/80">
-                      <p className="mb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                    <div className="max-w-[92%] rounded-2xl rounded-br-md border border-slate-700 bg-slate-900 px-4 py-3 shadow-sm">
+                      <p className="mb-1 text-[10px] font-bold tracking-wider text-slate-500 uppercase">
                         You
                       </p>
-                      <p className="text-sm font-medium text-slate-700">
+                      <p className="text-sm font-medium text-slate-300">
                         {ticket.message}
                       </p>
-                      <p className="mt-2 text-right text-[10px] text-slate-400">
+                      <p className="mt-2 text-right text-[10px] text-slate-500">
                         {new Date(ticket.created_at).toLocaleString()}
                       </p>
                     </div>
@@ -217,22 +217,22 @@ export function SupportPanel({ activeOrders, defaultOrderId }: Props) {
 
                   {ticket.admin_reply ? (
                     <div className="flex justify-start">
-                      <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-white px-4 py-3 shadow-sm">
-                        <p className="mb-1 text-[10px] font-bold tracking-wider text-emerald-700 uppercase">
+                      <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-emerald-500/30 bg-emerald-950/40 px-4 py-3 shadow-sm">
+                        <p className="mb-1 text-[10px] font-bold tracking-wider text-emerald-400 uppercase">
                           NovaVPN Support
                         </p>
-                        <p className="text-sm font-medium text-emerald-950">
+                        <p className="text-sm font-medium text-emerald-100">
                           {ticket.admin_reply}
                         </p>
                         {ticket.updated_at ? (
-                          <p className="mt-2 text-[10px] text-emerald-600/80">
+                          <p className="mt-2 text-[10px] text-emerald-500/80">
                             {new Date(ticket.updated_at).toLocaleString()}
                           </p>
                         ) : null}
                       </div>
                     </div>
                   ) : (
-                    <p className="text-center text-xs font-medium text-slate-400">
+                    <p className="text-center text-xs font-medium text-slate-500">
                       Awaiting engineer response…
                     </p>
                   )}

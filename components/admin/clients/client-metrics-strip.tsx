@@ -47,7 +47,8 @@ export function ClientMetricsStrip({ metrics, marzbanOnline, error }: Props) {
       {!marzbanOnline ? (
         <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/20 px-4 py-2 text-xs text-amber-200">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          Marzban API offline{error ? `: ${error}` : ""}
+          Live telemetry delayed — showing Supabase cache
+          {error ? ` (${error})` : ""}
         </div>
       ) : null}
       <div className="grid gap-4 md:grid-cols-3">

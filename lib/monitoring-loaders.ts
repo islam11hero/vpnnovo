@@ -1,9 +1,7 @@
 import "server-only";
 
-import {
-  fetchAllMarzbanUsers,
-  protocolLabelFromProxies,
-} from "@/lib/marzban/users-bulk";
+import { fetchAllMarzbanUsers, protocolLabelFromProxies } from "@/lib/marzban/users-bulk";
+import { getMarzbanApiUrl } from "@/lib/marzban-client";
 import type {
   MonitoringAbuseAlert,
   MonitoringAsnType,
@@ -13,7 +11,7 @@ import type {
   MonitoringPayload,
   MonitoringResourcePoint,
 } from "@/lib/monitoring-types";
-import { fetchPrimaryVultrInstance } from "@/lib/vultr";
+import { fetchPrimaryVultrInstance, isVultrEnabled } from "@/lib/vultr";
 
 const GB = 1024 ** 3;
 
@@ -145,14 +143,22 @@ function buildAbuseAlerts(
 }
 
 export async function loadMonitoringPayload(): Promise<MonitoringPayload> {
+  const vultrEnabled = isVultrEnabled();
   const [vultrResult, marzbanResult] = await Promise.all([
-    fetchPrimaryVultrInstance(),
+    vultrEnabled ? fetchPrimaryVultrInstance() : Promise.resolve({ ok: false as const, error: "disabled" }),
     fetchAllMarzbanUsers(),
   ]);
 
   const vultrOnline = vultrResult.ok;
   const instance = vultrOnline ? vultrResult.data : null;
-  const serverIp = instance?.main_ip ?? "—";
+  const marzbanHost = (() => {
+    try {
+      return new URL(getMarzbanApiUrl()).hostname;
+    } catch {
+      return "marzban-panel";
+    }
+  })();
+  const serverIp = instance?.main_ip ?? marzbanHost;
   const asnType: MonitoringAsnType = "datacenter";
   const seed = serverIp !== "—" ? hashIp(serverIp) : 42;
 
@@ -161,11 +167,13 @@ export async function loadMonitoringPayload(): Promise<MonitoringPayload> {
     fraudScore: serverIp !== "—" ? mockFraudScore(serverIp, asnType) : 0,
     blacklistStatus: "clean",
     asnType,
-    isp: vultrOnline ? `Vultr · ${instance?.label ?? "Fleet Node"}` : "Unknown",
-    asn: "AS20473 (Choopa / Vultr)",
+    isp: vultrOnline
+      ? `Vultr · ${instance?.label ?? "Fleet Node"}`
+      : `Marzban · ${marzbanHost}`,
+    asn: vultrOnline ? "AS20473 (Choopa / Vultr)" : "Marzban-managed egress",
     region: instance?.region ?? "—",
-    vultrOnline,
-    vultrError: vultrOnline ? undefined : vultrResult.error,
+    vultrOnline: vultrEnabled && vultrOnline,
+    vultrError: vultrEnabled && !vultrOnline ? vultrResult.error : undefined,
   };
 
   const marzbanOnline = marzbanResult.ok;

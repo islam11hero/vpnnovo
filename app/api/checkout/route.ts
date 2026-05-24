@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 
+/** Primary checkout — anonymous NOWPayments crypto invoices. */
+
 import { jsonError } from "@/lib/api/json-error";
-import { isAllowedPlan } from "@/lib/marzban";
+import {
+  isCheckoutPlanAllowed,
+  resolveCryptoCheckoutPlan,
+} from "@/lib/checkout-plans";
 import { createNowPaymentsInvoice } from "@/lib/nowpayments-invoice";
-import { resolvePlanAmountUsd } from "@/lib/plan-pricing";
 import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
 export async function POST(request: Request) {
@@ -18,6 +22,23 @@ export async function POST(request: Request) {
   } catch {
     return jsonError("Invalid JSON body", 400);
   }
+
+  const tierType =
+    typeof body === "object" &&
+    body !== null &&
+    "tierType" in body &&
+    ((body as { tierType: unknown }).tierType === "b2c" ||
+      (body as { tierType: unknown }).tierType === "proxy")
+      ? (body as { tierType: "b2c" | "proxy" }).tierType
+      : undefined;
+
+  const tierId =
+    typeof body === "object" &&
+    body !== null &&
+    "tierId" in body &&
+    typeof (body as { tierId: unknown }).tierId === "string"
+      ? (body as { tierId: string }).tierId.trim()
+      : undefined;
 
   const planName =
     typeof body === "object" &&
@@ -42,22 +63,27 @@ export async function POST(request: Request) {
         ? "annual"
         : "monthly";
 
-  if (!planName || !isAllowedPlan(planName)) {
-    return jsonError("Invalid or missing planName", 400);
+  const resolved = resolveCryptoCheckoutPlan({
+    planName: planName || undefined,
+    tierType,
+    tierId,
+    billing,
+  });
+
+  if (!resolved || !isCheckoutPlanAllowed(resolved.planName)) {
+    return jsonError("Invalid or missing plan", 400);
   }
 
-  const amount = resolvePlanAmountUsd(planName, billing);
-  if (amount === null || amount <= 0) {
-    return jsonError("Unknown plan pricing", 400);
-  }
+  const { planName: resolvedPlanName, amountUsd: amount } = resolved;
 
   const { data: order, error: insertError } = await db.client
     .from("orders")
     .insert({
-      plan_name: planName,
+      plan_name: resolvedPlanName,
       amount,
       status: "pending",
       is_renewal: false,
+      payment_provider: "nowpayments",
     })
     .select("id")
     .single();
@@ -75,7 +101,7 @@ export async function POST(request: Request) {
     const paymentUrl = await createNowPaymentsInvoice({
       orderId,
       amount,
-      planName,
+      planName: resolvedPlanName,
     });
 
     return NextResponse.json({

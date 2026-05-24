@@ -2,6 +2,7 @@
 
 import { FormEvent, useState, useTransition } from "react";
 import {
+  AlertCircle,
   Check,
   CheckCircle2,
   Copy,
@@ -12,6 +13,7 @@ import {
 import { toast } from "sonner";
 
 import { provisionFreeVipClientAction } from "@/actions/admin-vip-provision";
+import { buildVipHandoffClipboardText } from "@/lib/vip-handoff";
 import { validateMarzbanUsername } from "@/lib/marzban-validation";
 
 type Props = {
@@ -20,19 +22,22 @@ type Props = {
   onCreated: () => void;
 };
 
-type SuccessState = {
-  orderId: string;
-  username: string;
+type SuccessData = {
+  accessCode: string;
   subLink: string;
+  username: string;
+  message: string;
   clientLink: string;
+  portalLink: string;
 };
 
 export function CreateVipDialog({ open, onClose, onCreated }: Props) {
   const [username, setUsername] = useState("");
   const [months, setMonths] = useState(1);
   const [dataLimitGb, setDataLimitGb] = useState(100);
-  const [success, setSuccess] = useState<SuccessState | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [successData, setSuccessData] = useState<SuccessData | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [copiedHandoff, setCopiedHandoff] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   if (!open) return null;
@@ -41,8 +46,9 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
     setUsername("");
     setMonths(1);
     setDataLimitGb(100);
-    setSuccess(null);
-    setCopied(false);
+    setSuccessData(null);
+    setFormError(null);
+    setCopiedHandoff(false);
   };
 
   const handleClose = () => {
@@ -53,9 +59,11 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
     const validationError = validateMarzbanUsername(username);
     if (validationError) {
-      toast.error("Invalid username", { description: validationError });
+      setFormError(validationError);
       return;
     }
 
@@ -67,46 +75,63 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
       });
 
       if (!result.success) {
+        const errorMessage =
+          "error" in result
+            ? result.error
+            : "Marzban or Supabase rejected the request.";
+        setFormError(errorMessage);
         toast.error("VIP provisioning failed", {
-          description:
-            "error" in result
-              ? result.error
-              : "Marzban or Supabase rejected the request.",
-        });
-        return;
-      }
-      if (!result.data?.subLink) {
-        toast.error("VIP provisioning failed", {
-          description: "Marzban did not return a subscription link.",
+          description: errorMessage,
         });
         return;
       }
 
-      setSuccess({
-        orderId: result.data.orderId,
-        username: result.data.username,
+      if (!result.data) {
+        setFormError("Provisioning succeeded but returned no handoff payload.");
+        return;
+      }
+
+      setSuccessData({
+        accessCode: result.data.accessCode,
         subLink: result.data.subLink,
+        username: result.data.username,
+        message: result.data.message,
         clientLink: result.data.clientLink,
+        portalLink: result.data.portalLink,
       });
       onCreated();
-      toast.success("Free VIP client provisioned", {
-        description: `${result.data.username} · subscription link ready`,
+      toast.success(result.data.message, {
+        description: `${result.data.username} · handoff ready`,
       });
     });
   };
 
-  const copySubLink = async () => {
-    if (!success?.subLink) return;
+  const loginHandoffUrl =
+    typeof window !== "undefined" && successData
+      ? `${window.location.origin}/login?key=${successData.accessCode}`
+      : "";
+
+  const copyHandoffMessage = async () => {
+    if (!successData) return;
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    const text = buildVipHandoffClipboardText({
+      accessCode: successData.accessCode,
+      subLink: successData.subLink,
+      username: successData.username,
+      origin,
+    });
+
     try {
-      await navigator.clipboard.writeText(success.subLink);
-      setCopied(true);
-      toast.success("Client link copied", {
-        description: "Paste into WhatsApp or import into v2rayNG / AdsPower.",
+      await navigator.clipboard.writeText(text);
+      setCopiedHandoff(true);
+      toast.success("Handoff message copied", {
+        description: "Magic login URL + subscription link ready for WhatsApp.",
       });
-      setTimeout(() => setCopied(false), 2200);
+      setTimeout(() => setCopiedHandoff(false), 2500);
     } catch {
       toast.error("Clipboard blocked", {
-        description: "Select the link field and copy manually.",
+        description: "Select the fields and copy manually.",
       });
     }
   };
@@ -144,52 +169,79 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
           </button>
         </div>
 
-        {success ? (
+        {successData ? (
           <div className="space-y-5">
-            <div className="text-center">
-              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10 shadow-[0_0_32px_rgba(16,185,129,0.25)]">
-                <CheckCircle2 className="h-10 w-10 text-emerald-400" />
+            <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 via-slate-950 to-slate-950 p-6">
+              <div className="text-center">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10 shadow-[0_0_32px_rgba(16,185,129,0.25)]">
+                  <CheckCircle2 className="h-10 w-10 text-emerald-400" />
+                </div>
+                <p className="mt-4 text-sm font-bold tracking-widest text-emerald-400 uppercase">
+                  {successData.message}
+                </p>
+                <p className="mt-2 font-mono text-lg font-bold text-white">
+                  {successData.username}
+                </p>
               </div>
-              <p className="mt-4 text-sm font-bold tracking-widest text-emerald-400 uppercase">
-                Shield provisioned
-              </p>
-              <p className="mt-2 font-mono text-lg font-bold text-white">
-                {success.username}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                VIP Free Trial · Dashboard ID{" "}
-                <span className="font-mono text-slate-400">
-                  {success.orderId.slice(0, 8)}…
-                </span>
-              </p>
-            </div>
 
-            <div>
-              <label className="mb-2 block text-[10px] font-bold tracking-widest text-slate-500 uppercase">
-                Marzban subscription link
-              </label>
-              <input
-                readOnly
-                value={success.subLink}
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-xs text-cyan-300/90 focus:outline-none"
-              />
-              <p className="mt-2 text-[11px] text-slate-600">
-                Portal:{" "}
-                <span className="font-mono text-slate-500">{success.clientLink}</span>
-              </p>
+              <div className="mt-6 space-y-4">
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
+                    Order ID / Access Code
+                  </p>
+                  <p className="break-all rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-sm font-bold text-cyan-300">
+                    {successData.accessCode}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
+                    Direct Node Link
+                  </p>
+                  <input
+                    readOnly
+                    value={successData.subLink}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-xs text-violet-300/90 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
+                    Instant Portal (no login)
+                  </p>
+                  <input
+                    readOnly
+                    value={successData.portalLink}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-xs text-cyan-300/90 focus:outline-none"
+                  />
+                </div>
+
+                {loginHandoffUrl ? (
+                  <div>
+                    <p className="mb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
+                      Magic login URL
+                    </p>
+                    <input
+                      readOnly
+                      value={loginHandoffUrl}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-xs text-slate-400 focus:outline-none"
+                    />
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <button
               type="button"
-              onClick={() => void copySubLink()}
+              onClick={() => void copyHandoffMessage()}
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/50 bg-emerald-600 py-4 text-base font-black tracking-wide text-white uppercase shadow-lg shadow-emerald-900/30 hover:bg-emerald-500"
             >
-              {copied ? (
+              {copiedHandoff ? (
                 <Check className="h-5 w-5" />
               ) : (
                 <Copy className="h-5 w-5" />
               )}
-              {copied ? "Copied!" : "Copy Client Link"}
+              {copiedHandoff ? "Copied!" : "Copy Handoff Message"}
             </button>
 
             <button
@@ -202,6 +254,16 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            {formError ? (
+              <div
+                role="alert"
+                className="flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200"
+              >
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+                <p className="font-medium">{formError}</p>
+              </div>
+            ) : null}
+
             <div>
               <label
                 htmlFor="vip-username"
@@ -217,9 +279,10 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
                 spellCheck={false}
                 placeholder="Ahmed_VIP"
                 value={username}
-                onChange={(e) =>
-                  setUsername(e.target.value.replace(/\s/g, ""))
-                }
+                onChange={(e) => {
+                  setFormError(null);
+                  setUsername(e.target.value.replace(/\s/g, ""));
+                }}
                 className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-sm text-white placeholder:text-slate-600 focus:border-violet-500/50 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
               />
               <p className="mt-1.5 text-[11px] text-slate-600">

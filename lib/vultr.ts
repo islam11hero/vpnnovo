@@ -25,6 +25,10 @@ export type VultrResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 
+export function isVultrEnabled(): boolean {
+  return Boolean(process.env.VULTR_API_KEY?.trim());
+}
+
 function getVultrApiKey(): string | null {
   const key = process.env.VULTR_API_KEY?.trim();
   return key || null;
@@ -65,6 +69,9 @@ async function vultrFetch<T>(path: string): Promise<VultrResult<T>> {
 export async function fetchVultrAccount(): Promise<
   VultrResult<VultrAccountInfo>
 > {
+  if (!isVultrEnabled()) {
+    return { ok: false, error: "Vultr integration disabled" };
+  }
   const result = await vultrFetch<{ account?: VultrAccountInfo }>("/account");
   if (!result.ok) return result;
   const account = result.data.account;
@@ -83,6 +90,9 @@ export async function fetchVultrAccount(): Promise<
 export async function fetchVultrInstances(): Promise<
   VultrResult<VultrInstance[]>
 > {
+  if (!isVultrEnabled()) {
+    return { ok: false, error: "Vultr integration disabled" };
+  }
   const result = await vultrFetch<{ instances?: VultrInstance[] }>(
     "/instances",
   );

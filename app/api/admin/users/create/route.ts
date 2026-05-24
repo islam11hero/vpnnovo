@@ -65,6 +65,8 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     success: true,
+    message: result.data.message,
+    access_code: result.data.accessCode,
     order_id: result.data.orderId,
     vpn_username: result.data.username,
     client_link: result.data.clientLink,

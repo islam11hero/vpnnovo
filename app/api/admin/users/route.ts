@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getMarzbanAdminToken, MarzbanError } from "@/lib/marzban";
-import { marzbanFetch } from "@/lib/marzban-http";
+import { MarzbanError } from "@/lib/marzban-error";
+import { marzbanFetchOrThrow } from "@/lib/marzban-client";
 import { isAdminAuthenticated, unauthorizedAdminResponse } from "@/lib/require-admin";
 
 export const runtime = "nodejs";
@@ -13,11 +13,7 @@ export async function GET() {
   }
 
   try {
-    const { token } = await getMarzbanAdminToken();
-
-    const usersRes = await marzbanFetch("/api/users", {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    });
+    const usersRes = await marzbanFetchOrThrow("/api/users");
 
     if (!usersRes.ok) {
       return NextResponse.json(

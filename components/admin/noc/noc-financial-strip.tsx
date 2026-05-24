@@ -32,14 +32,16 @@ export function NocFinancialStrip({ financial, bandwidth }: Props) {
       label: "Net Profit",
       value: formatUsd(financial.netProfit),
       valueClass: netProfitClass,
-      sub: `Vultr pending: ${formatUsd(financial.vultrPendingCharges)}`,
+      sub: financial.vultr.configured
+        ? `Vultr pending: ${formatUsd(financial.vultrPendingCharges)}`
+        : "Marzban + Supabase ledger",
       icon: DollarSign,
       iconColor: financial.netProfit >= 0 ? "text-emerald-400" : "text-red-400",
       accent:
         financial.netProfit >= 0
           ? "from-emerald-500/20 to-emerald-600/5"
           : "from-red-500/20 to-red-600/5",
-      offline: !financial.supabase.online || !financial.vultr.online,
+      offline: !financial.supabase.online,
     },
     {
       label: "Paid Orders",
@@ -61,7 +63,7 @@ export function NocFinancialStrip({ financial, bandwidth }: Props) {
       icon: HardDrive,
       iconColor: bandwidth.burnPercent >= 90 ? "text-red-400" : "text-indigo-400",
       accent: "from-indigo-500/20 to-indigo-600/5",
-      offline: !bandwidth.marzban.online || !bandwidth.vultr.online,
+      offline: !bandwidth.marzban.online,
     },
   ];
 

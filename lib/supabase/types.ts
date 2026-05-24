@@ -20,4 +20,11 @@ export type SupabaseOrder = {
   target_username?: string | null;
   payment_currency?: string | null;
   tx_hash?: string | null;
+  /** Cached Marzban telemetry when live API is delayed. */
+  used_traffic?: number | null;
+  data_limit?: number | null;
+  marzban_status?: string | null;
+  wallet_balance_usd?: number | null;
+  payment_provider?: string | null;
+  stripe_session_id?: string | null;
 };

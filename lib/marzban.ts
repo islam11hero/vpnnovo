@@ -1,6 +1,14 @@
-import { getMarzbanApiUrl, marzbanFetch } from "@/lib/marzban-http";
+import { MarzbanError } from "@/lib/marzban-error";
+import {
+  getMarzbanApiUrl,
+  getMarzbanToken,
+  marzbanFetchJson,
+  marzbanFetchOrThrow,
+} from "@/lib/marzban-client";
+import { extractMarzbanSubscriptionFromPayload } from "@/lib/marzban-subscription";
 import { validateMarzbanUsername } from "@/lib/marzban-validation";
 import type { MarzbanUserStats } from "@/lib/marzban-types";
+import { VIP_FREE_PLAN_NAME } from "@/lib/vip-constants";
 
 /** God-Tier dual-core: VLESS Vision TCP + gRPC (stable panel inbounds). */
 export const MARZBAN_PROXIES = {
@@ -24,22 +32,71 @@ export const MARZBAN_USER_CORE = {
 
 export { validateMarzbanUsername, MARZBAN_USERNAME_PATTERN } from "@/lib/marzban-validation";
 
-/** POST /api/user — omit inbounds so Marzban assigns all active default inbounds. */
+/** 1 GB in bytes — Marzban data_limit unit. */
+export const MARZBAN_GB_BYTES = 1073741824;
+
+/** Calendar-month expiry from a Unix timestamp (seconds). */
+export function addCalendarMonthsUnix(fromSec: number, months: number): number {
+  const d = new Date(fromSec * 1000);
+  d.setMonth(d.getMonth() + Math.floor(months));
+  return Math.floor(d.getTime() / 1000);
+}
+
+/**
+ * POST /api/user — strict payload only. Never send `proxies`, `inbounds`, or other
+ * empty config objects; Marzban FastAPI expects these keys omitted to use panel defaults.
+ */
 export function buildMarzbanCreateUserBody(input: {
+  username: string;
+  durationMonths: number;
+  dataCapGB: number;
+}): {
   username: string;
   expire: number;
   data_limit: number;
-  note: string;
-  status?: "active" | "disabled";
-}) {
+  data_limit_reset_strategy: "no_reset";
+} {
+  const durationMonths = Math.floor(Number(input.durationMonths));
+  const dataCapGB = Number(input.dataCapGB);
+
   return {
-    username: input.username,
-    proxies: { vless: {} },
+    username: input.username.trim(),
+    expire:
+      durationMonths > 0
+        ? addCalendarMonthsUnix(Math.floor(Date.now() / 1000), durationMonths)
+        : 0,
+    data_limit:
+      dataCapGB > 0 ? Math.floor(dataCapGB * MARZBAN_GB_BYTES) : 0,
+    data_limit_reset_strategy: "no_reset",
+  };
+}
+
+/** Omit keys that break Marzban when sent as empty objects on PUT. */
+export function omitMarzbanProxyFields<T extends Record<string, unknown>>(
+  body: T,
+): Omit<T, "proxies" | "inbounds"> {
+  const rest = { ...body };
+  delete rest.proxies;
+  delete rest.inbounds;
+  return rest;
+}
+
+/** Build create payload from explicit expire timestamp (paid checkout flows). */
+export function buildMarzbanCreateUserBodyWithExpire(input: {
+  username: string;
+  expire: number;
+  data_limit?: number;
+}): {
+  username: string;
+  expire: number;
+  data_limit: number;
+  data_limit_reset_strategy: "no_reset";
+} {
+  return {
+    username: input.username.trim(),
     expire: input.expire,
-    data_limit: input.data_limit,
-    data_limit_reset_strategy: "no_reset" as const,
-    status: input.status ?? "active",
-    note: input.note,
+    data_limit: input.data_limit ?? 0,
+    data_limit_reset_strategy: "no_reset",
   };
 }
 
@@ -81,6 +138,8 @@ export function extractMarzbanSubscriptionLink(
     links?: string[];
   },
 ): string {
+  const fromPayload = extractMarzbanSubscriptionFromPayload(apiUrl, userData);
+  if (fromPayload) return fromPayload;
   return resolveSubscriptionUrl(apiUrl, userData);
 }
 
@@ -91,9 +150,11 @@ const ALLOWED_PLANS = new Set([
   "6 Months",
   "1 Year",
   "Normaroc Sovereign (OPSEC)",
+  VIP_FREE_PLAN_NAME,
 ]);
 
 export function planToExpireMonths(planName: string): number {
+  if (planName === VIP_FREE_PLAN_NAME) return 1;
   if (planName === "Normaroc Sovereign (OPSEC)" || planName === "1 Year") return 12;
   if (planName === "6 Months") return 6;
   return 1;
@@ -119,63 +180,23 @@ export function isAllowedPlan(planName: string): boolean {
 export type MarzbanProvisionResult = {
   username: string;
   sub_link: string;
+  createPayload?: unknown;
 };
 
-export class MarzbanError extends Error {
-  constructor(
-    message: string,
-    public readonly status = 500,
-  ) {
-    super(message);
-    this.name = "MarzbanError";
-  }
-}
+export { MarzbanError } from "@/lib/marzban-error";
 
 export type MarzbanAdminAction = "toggle_status" | "reset_usage" | "delete";
-
-function getMarzbanCredentials() {
-  const apiUrl = getMarzbanApiUrl();
-  const username = process.env.MARZBAN_USERNAME?.trim();
-  const password = process.env.MARZBAN_PASSWORD?.trim();
-  if (!username || !password) {
-    throw new MarzbanError(
-      "Missing MARZBAN_USERNAME or MARZBAN_PASSWORD in environment",
-      500,
-    );
-  }
-  return { apiUrl, username, password };
-}
 
 export async function getMarzbanAdminToken(): Promise<{
   apiUrl: string;
   token: string;
 }> {
-  const { apiUrl, username, password } = getMarzbanCredentials();
-
-  const tokenRes = await marzbanFetch("/api/admin/token", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-    },
-    body: new URLSearchParams({
-      username,
-      password,
-      grant_type: "password",
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    throw new MarzbanError("Invalid Marzban credentials in .env", 401);
+  const apiUrl = getMarzbanApiUrl();
+  const tokenResult = await getMarzbanToken();
+  if (!tokenResult.success) {
+    throw new MarzbanError(tokenResult.error, 502);
   }
-
-  const tokenPayload = (await tokenRes.json()) as { access_token?: string };
-  const token = tokenPayload.access_token;
-  if (!token) {
-    throw new MarzbanError("Marzban token response invalid", 502);
-  }
-
-  return { apiUrl, token };
+  return { apiUrl, token: tokenResult.data };
 }
 
 export async function executeMarzbanAdminAction(
@@ -190,7 +211,7 @@ export async function executeMarzbanAdminAction(
   };
 
   if (action === "toggle_status") {
-    const getRes = await marzbanFetch(`/api/user/${encoded}`, {
+    const getRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
       headers: authHeaders,
     });
     if (!getRes.ok) {
@@ -202,7 +223,7 @@ export async function executeMarzbanAdminAction(
     }
     const user = (await getRes.json()) as { status?: string };
     const isActive = user.status?.toLowerCase() === "active";
-    const putRes = await marzbanFetch(`/api/user/${encoded}`, {
+    const putRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
       method: "PUT",
       headers: {
         ...authHeaders,
@@ -223,7 +244,7 @@ export async function executeMarzbanAdminAction(
   }
 
   if (action === "reset_usage") {
-    const resetRes = await marzbanFetch(`/api/user/${encoded}/reset`, {
+    const resetRes = await marzbanFetchOrThrow(`/api/user/${encoded}/reset`, {
       method: "POST",
       headers: authHeaders,
     });
@@ -237,7 +258,7 @@ export async function executeMarzbanAdminAction(
     return;
   }
 
-  const deleteRes = await marzbanFetch(`/api/user/${encoded}`, {
+  const deleteRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
     method: "DELETE",
     headers: authHeaders,
   });
@@ -262,7 +283,7 @@ export async function setMarzbanUserStatus(
     Accept: "application/json",
   };
 
-  const getRes = await marzbanFetch(`/api/user/${encoded}`, {
+  const getRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
     headers: authHeaders,
   });
   if (!getRes.ok) {
@@ -273,17 +294,13 @@ export async function setMarzbanUserStatus(
     );
   }
 
-  const existing = (await getRes.json()) as Record<string, unknown>;
-  const putRes = await marzbanFetch(`/api/user/${encoded}`, {
+  const putRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
     method: "PUT",
     headers: {
       ...authHeaders,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      ...existing,
-      status,
-    }),
+    body: JSON.stringify({ status }),
   });
 
   if (!putRes.ok) {
@@ -301,7 +318,7 @@ export async function fetchMarzbanUserSubscriptionLink(
 ): Promise<string> {
   const { apiUrl, token } = await getMarzbanAdminToken();
   const encoded = encodeURIComponent(targetUsername);
-  const res = await marzbanFetch(`/api/user/${encoded}`, {
+  const res = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
@@ -341,21 +358,15 @@ export async function provisionTrialMarzbanUser(
   orderId: string,
 ): Promise<MarzbanProvisionResult> {
   const { apiUrl, token } = await getMarzbanAdminToken();
-  const expireTime = Math.floor(Date.now() / 1000) + TRIAL_DURATION_SECONDS;
   const username = `trial_${orderId.substring(0, 8)}`;
 
-  const payload = {
+  const payload = buildMarzbanCreateUserBodyWithExpire({
     username,
-    proxies: MARZBAN_PROXIES,
-    inbounds: MARZBAN_TRIAL_INBOUNDS,
+    expire: Math.floor(Date.now() / 1000) + TRIAL_DURATION_SECONDS,
     data_limit: TRIAL_DATA_LIMIT_BYTES,
-    expire: expireTime,
-    data_limit_reset_strategy: "no_reset" as const,
-    status: "active" as const,
-    note: "24-Hour Stealth Trial · 1GB",
-  };
+  });
 
-  const userRes = await marzbanFetch("/api/user", {
+  const userRes = await marzbanFetchOrThrow("/api/user", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -411,35 +422,29 @@ export async function provisionManualMarzbanUser(params: {
   }
 
   const { apiUrl, token } = await getMarzbanAdminToken();
-  const expireDate = new Date();
-  expireDate.setMonth(expireDate.getMonth() + Math.floor(params.months));
-  const expireTimestamp = Math.floor(expireDate.getTime() / 1000);
-  const data_limit =
-    params.dataLimitGb <= 0 ? 0 : Math.floor(params.dataLimitGb * 1024 ** 3);
 
-  const payload = buildMarzbanCreateUserBody({
+  const marzbanPayload = buildMarzbanCreateUserBody({
     username,
-    expire: expireTimestamp,
-    data_limit,
-    note: `VIP Free · ${planName}`,
+    durationMonths: params.months,
+    dataCapGB: params.dataLimitGb,
   });
 
-  const userRes = await marzbanFetch("/api/user", {
+  const createRes = await marzbanFetchJson<Record<string, unknown>>("/api/user", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(marzbanPayload),
   });
 
-  if (!userRes.ok) {
-    const errText = await userRes.text();
-    const status = userRes.status;
+  if (!createRes.success) {
+    const errText = createRes.error ?? "";
+    const status = createRes.status ?? 500;
     if (isMarzbanUsernameTakenError(status, errText)) {
       throw new MarzbanError(
-        "Username already taken, please choose another.",
+        "Username already exists in Marzban. Please choose another.",
         409,
       );
     }
@@ -449,27 +454,32 @@ export async function provisionManualMarzbanUser(params: {
     );
   }
 
-  const userData = (await userRes.json()) as {
-    subscription_url?: string;
-    links?: string[];
-  };
+  let subPath = extractMarzbanSubscriptionFromPayload(apiUrl, createRes.data);
 
-  const subPath = extractMarzbanSubscriptionLink(apiUrl, userData);
   if (!subPath) {
-    throw new MarzbanError("Marzban returned no subscription URL", 502);
+    const getRes = await marzbanFetchJson<Record<string, unknown>>(
+      `/api/user/${encodeURIComponent(username)}`,
+      { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } },
+    );
+    if (getRes.success) {
+      subPath = extractMarzbanSubscriptionFromPayload(apiUrl, getRes.data);
+    }
   }
 
-  return { username, sub_link: subPath };
+  if (!subPath) {
+    console.warn(
+      "[marzban] VIP user created but subscription URL missing:",
+      username,
+    );
+  }
+
+  return { username, sub_link: subPath ?? "", createPayload: createRes.data };
 }
 
 /** Ping Marzban admin token endpoint (diagnostics). */
 export async function checkMarzbanConnection(): Promise<boolean> {
-  try {
-    await getMarzbanAdminToken();
-    return true;
-  } catch {
-    return false;
-  }
+  const token = await getMarzbanToken();
+  return token.success;
 }
 
 /** Create a Marzban user and return subscription link + username. */
@@ -483,19 +493,15 @@ export async function provisionMarzbanUser(
   const { apiUrl, token } = await getMarzbanAdminToken();
 
   const expireMonths = planToExpireMonths(planName);
-  const expireDate = new Date();
-  expireDate.setMonth(expireDate.getMonth() + expireMonths);
-  const expireTimestamp = Math.floor(expireDate.getTime() / 1000);
   const randomUsername = `IPNOVA_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
   const payload = buildMarzbanCreateUserBody({
     username: randomUsername,
-    expire: expireTimestamp,
-    data_limit: 0,
-    note: `Plan: ${planName}`,
+    durationMonths: expireMonths,
+    dataCapGB: 0,
   });
 
-  const userRes = await marzbanFetch("/api/user", {
+  const userRes = await marzbanFetchOrThrow("/api/user", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -527,19 +533,30 @@ export async function provisionMarzbanUser(
   return { username: randomUsername, sub_link: subPath };
 }
 
+function resolveRenewMonths(planName: string): number {
+  if (isAllowedPlan(planName)) {
+    return planToExpireMonths(planName);
+  }
+  const lower = planName.toLowerCase();
+  if (lower.includes("annual") || lower.includes("year")) return 12;
+  if (lower.includes("6 month")) return 6;
+  if (lower.includes("business")) return 1;
+  return 1;
+}
+
 /** Extend an existing Marzban user's expiry (renewal flow). */
 export async function renewMarzbanUser(
   targetUsername: string,
   planName: string,
 ): Promise<MarzbanProvisionResult> {
-  if (!isAllowedPlan(planName)) {
-    throw new MarzbanError("Invalid or missing planName", 400);
+  if (!targetUsername?.trim()) {
+    throw new MarzbanError("Invalid target username", 400);
   }
 
   const { apiUrl, token } = await getMarzbanAdminToken();
   const encoded = encodeURIComponent(targetUsername);
 
-  const getRes = await marzbanFetch(`/api/user/${encoded}`, {
+  const getRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
@@ -564,10 +581,10 @@ export async function renewMarzbanUser(
   const currentExpire = userData.expire ?? 0;
   const base = currentExpire > now ? currentExpire : now;
   const expireDate = new Date(base * 1000);
-  expireDate.setMonth(expireDate.getMonth() + planToExpireMonths(planName));
+  expireDate.setMonth(expireDate.getMonth() + resolveRenewMonths(planName));
   const newExpire = Math.floor(expireDate.getTime() / 1000);
 
-  const putRes = await marzbanFetch(`/api/user/${encoded}`, {
+  const putRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -617,7 +634,7 @@ export async function revokeAndRefreshMarzbanSubscription(
     Accept: "application/json",
   };
 
-  const revokeRes = await marzbanFetch(`/api/user/${encoded}/revoke_sub`, {
+  const revokeRes = await marzbanFetchOrThrow(`/api/user/${encoded}/revoke_sub`, {
     method: "POST",
     headers: authHeaders,
   });
@@ -630,7 +647,7 @@ export async function revokeAndRefreshMarzbanSubscription(
     );
   }
 
-  const getRes = await marzbanFetch(`/api/user/${encoded}`, {
+  const getRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
     headers: authHeaders,
   });
 

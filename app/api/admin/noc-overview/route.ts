@@ -105,6 +105,7 @@ export async function GET() {
     true,
     vultrBilling.online,
     vultrBilling.error,
+    vultrBilling.configured,
   );
 
   const marzbanUsers = await fetchAllMarzbanUsers();
@@ -120,6 +121,7 @@ export async function GET() {
     fleet.vultr.online,
     marzbanUsers.ok ? undefined : marzbanUsers.error,
     fleet.vultr.error,
+    fleet.vultr.configured !== false,
   );
 
   let marzbanOnline = false;

@@ -3,13 +3,17 @@
 import { revalidatePath } from "next/cache";
 
 import { actionErr, actionOk, type ActionResult } from "@/lib/actions-result";
-import { getMarzbanAdminToken, MarzbanError } from "@/lib/marzban";
+import { MarzbanError } from "@/lib/marzban-error";
+import { marzbanFetchOrThrow } from "@/lib/marzban-client";
 import { restartMarzbanCore } from "@/lib/marzban/core-restart";
-import { marzbanFetch } from "@/lib/marzban-http";
+import { isAdminAuthenticated } from "@/lib/require-admin";
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]{1,64}$/;
 
 export async function flushXraySessionsAction(): Promise<ActionResult<{ queued: boolean }>> {
+  if (!isAdminAuthenticated()) {
+    return actionErr("Unauthorized");
+  }
   try {
     await restartMarzbanCore();
     revalidatePath("/admin/monitoring");
@@ -28,35 +32,25 @@ export async function flushXraySessionsAction(): Promise<ActionResult<{ queued: 
 export async function promoteVipNodeAction(
   username: string,
 ): Promise<ActionResult<{ username: string }>> {
+  if (!isAdminAuthenticated()) {
+    return actionErr("Unauthorized");
+  }
   const target = username?.trim() ?? "";
   if (!USERNAME_PATTERN.test(target)) {
     return actionErr("Invalid Marzban username.");
   }
 
   try {
-    const { token } = await getMarzbanAdminToken();
     const encoded = encodeURIComponent(target);
-    const getRes = await marzbanFetch(`/api/user/${encoded}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    });
+    const getRes = await marzbanFetchOrThrow(`/api/user/${encoded}`);
     if (!getRes.ok) {
       const text = await getRes.text();
       throw new MarzbanError(text.slice(0, 300) || "User not found", getRes.status);
     }
-    const existing = (await getRes.json()) as Record<string, unknown>;
-
-    const putRes = await marzbanFetch(`/api/user/${encoded}`, {
+    const putRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
       method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...existing,
-        status: "active",
-        note: `VIP static routing profile · promoted ${new Date().toISOString()}`,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "active" }),
     });
 
     if (!putRes.ok) {

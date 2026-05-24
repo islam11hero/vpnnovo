@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { actionErr, actionOk, type ActionResult } from "@/lib/actions-result";
+import { assertOrderAccess } from "@/lib/order-access";
 import { isAdminAuthenticated } from "@/lib/require-admin";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
 import { ACTIVE_NODE_STATUSES } from "@/lib/orders";
@@ -40,6 +41,9 @@ export async function createSupportTicket(input: {
 
   const db = getDb();
   if (!db.ok) return actionErr(db.error);
+
+  const access = await assertOrderAccess(order_id);
+  if (!access.ok) return actionErr(access.error);
 
   const { data: order } = await db.client
     .from("orders")
@@ -83,6 +87,9 @@ export async function getTicketsForOrder(
 
   const db = getDb();
   if (!db.ok) return actionErr(db.error);
+
+  const access = await assertOrderAccess(order_id);
+  if (!access.ok) return actionErr(access.error);
 
   const { data: order } = await db.client
     .from("orders")

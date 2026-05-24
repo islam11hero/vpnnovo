@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Fingerprint, Shield } from "lucide-react";
 
+import { DashboardSignOut } from "@/components/dashboard/DashboardSignOut";
+
 export default function DashboardLayout({
   children,
 }: {
@@ -18,10 +20,13 @@ export default function DashboardLayout({
               IPNOVA
             </span>
           </Link>
-          <span className="hidden items-center gap-2 rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1.5 text-xs font-bold tracking-widest text-cyan-500/90 uppercase sm:flex">
-            <Fingerprint className="h-3.5 w-3.5" />
-            OPSEC Security Vault
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden items-center gap-2 rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1.5 text-xs font-bold tracking-widest text-cyan-500/90 uppercase sm:flex">
+              <Fingerprint className="h-3.5 w-3.5" />
+              OPSEC Security Vault
+            </span>
+            <DashboardSignOut />
+          </div>
         </div>
       </header>
       <main className="px-4 py-6 lg:px-6 lg:py-8">{children}</main>

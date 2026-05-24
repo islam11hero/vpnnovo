@@ -2,6 +2,7 @@
 
 export type ApiWidgetStatus = {
   online: boolean;
+  configured?: boolean;
   error?: string;
 };
 

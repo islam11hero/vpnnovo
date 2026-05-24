@@ -1,8 +1,11 @@
 import "server-only";
 
-import { getMarzbanAdminToken } from "@/lib/marzban";
-import { marzbanFetch } from "@/lib/marzban-http";
+import { marzbanFetchJson } from "@/lib/marzban-client";
 import { normalizeMarzbanUsers } from "@/lib/marzban-users";
+import {
+  syncOrderTelemetryCache,
+  type CachedTelemetry,
+} from "@/lib/orders-telemetry-cache";
 
 export type MarzbanUserRecord = {
   username: string;
@@ -16,6 +19,12 @@ export type MarzbanUserRecord = {
   online_at: string | null;
   subscription_url: string | null;
   links: string[];
+};
+
+export type ClientCommandRow = MarzbanUserRecord & {
+  orderId?: string;
+  telemetryLive: boolean;
+  telemetryDelayed: boolean;
 };
 
 function parseUser(raw: Record<string, unknown>): MarzbanUserRecord {
@@ -46,6 +55,14 @@ function parseUser(raw: Record<string, unknown>): MarzbanUserRecord {
   };
 }
 
+function toCachedTelemetry(user: MarzbanUserRecord): CachedTelemetry {
+  return {
+    usedTraffic: user.used_traffic,
+    dataLimit: user.data_limit,
+    marzbanStatus: user.status,
+  };
+}
+
 export function protocolLabelFromProxies(
   proxies: Record<string, unknown>,
 ): string {
@@ -65,42 +82,59 @@ export function sessionStatusLabel(
   return status || "Unknown";
 }
 
+/** Build a grid row from Supabase telemetry cache when Marzban is delayed. */
+export function cachedRowToMarzbanUser(
+  username: string,
+  cache: CachedTelemetry,
+): MarzbanUserRecord {
+  return {
+    username,
+    status: cache.marzbanStatus,
+    used_traffic: cache.usedTraffic,
+    data_limit: cache.dataLimit,
+    expire: null,
+    note: null,
+    proxies: {},
+    onlines_limit: null,
+    online_at: null,
+    subscription_url: null,
+    links: [],
+  };
+}
+
+export function sumMarzbanUsedTraffic(users: MarzbanUserRecord[]): number {
+  return users.reduce((sum, user) => sum + (user.used_traffic || 0), 0);
+}
+
+export function countActiveMarzbanSessions(users: MarzbanUserRecord[]): number {
+  return users.filter(
+    (user) =>
+      Boolean(user.online_at) ||
+      user.status.toLowerCase() === "active",
+  ).length;
+}
+
 export async function fetchAllMarzbanUsers(): Promise<
   | { ok: true; users: MarzbanUserRecord[]; byUsername: Map<string, MarzbanUserRecord> }
   | { ok: false; error: string }
 > {
-  try {
-    const { token } = await getMarzbanAdminToken();
-    const res = await marzbanFetch("/api/users", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
+  const res = await marzbanFetchJson<{ users?: unknown }>("/api/users");
 
-    if (!res.ok) {
-      const text = await res.text();
-      return { ok: false, error: text.slice(0, 200) || `HTTP ${res.status}` };
-    }
-
-    const payload = await res.json();
-    const normalized = normalizeMarzbanUsers(payload);
-    const users = normalized.map((u) =>
-      parseUser(u as unknown as Record<string, unknown>),
-    );
-    const byUsername = new Map(users.map((u) => [u.username, u]));
-    return { ok: true, users, byUsername };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Marzban users fetch failed";
-    return { ok: false, error: message };
+  if (!res.success) {
+    return { ok: false, error: res.error };
   }
-}
 
-export function sumMarzbanUsedTraffic(users: MarzbanUserRecord[]): number {
-  return users.reduce((s, u) => s + (u.used_traffic ?? 0), 0);
-}
+  const normalized = normalizeMarzbanUsers(res.data);
+  const users = normalized.map((raw) =>
+    parseUser(raw as Record<string, unknown>),
+  );
 
-export function countActiveMarzbanSessions(users: MarzbanUserRecord[]): number {
-  return users.filter((u) => Boolean(u.online_at)).length;
+  const byUsername = new Map<string, MarzbanUserRecord>();
+  for (const user of users) {
+    if (!user.username) continue;
+    byUsername.set(user.username, user);
+    await syncOrderTelemetryCache(user.username, toCachedTelemetry(user));
+  }
+
+  return { ok: true, users, byUsername };
 }

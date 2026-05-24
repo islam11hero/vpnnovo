@@ -1,3 +1,4 @@
+import { formatUnixDate, usagePercent } from "@/lib/formatters";
 import type { MarzbanUserRecord } from "@/lib/marzban/users-bulk";
 
 const SEVEN_DAYS_SEC = 7 * 24 * 60 * 60;
@@ -53,15 +54,9 @@ export function resolveClientShieldStatus(
 }
 
 export function formatExpiryLabel(expire: number | null): string {
-  if (expire == null || expire <= 0) return "Never";
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(expire * 1000));
+  return formatUnixDate(expire);
 }
 
 export function bandwidthPercent(used: number, limit: number): number {
-  if (!limit || limit <= 0) return 0;
-  return Math.min(100, (used / limit) * 100);
+  return usagePercent(used, limit);
 }

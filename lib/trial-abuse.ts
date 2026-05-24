@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getSupabaseAdminResult } from "@/lib/supabase/admin";
 import { extractClientIp } from "@/lib/request-ip";
 
 export { extractClientIp };
@@ -22,13 +22,34 @@ export async function hasTrialAbuseRecord(
   ipAddress: string,
   deviceHash: string,
 ): Promise<boolean> {
-  const existing = await prisma.trialLog.findFirst({
-    where: {
-      OR: [{ ipAddress }, { deviceHash }],
-    },
-    select: { id: true },
-  });
-  return Boolean(existing);
+  const db = getSupabaseAdminResult();
+  if (!db.ok) {
+    throw new Error(db.error);
+  }
+
+  const [ipMatch, deviceMatch] = await Promise.all([
+    db.client
+      .from("trial_logs")
+      .select("id")
+      .eq("ip_address", ipAddress)
+      .limit(1)
+      .maybeSingle(),
+    db.client
+      .from("trial_logs")
+      .select("id")
+      .eq("device_hash", deviceHash)
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (ipMatch.error) {
+    throw new Error(ipMatch.error.message);
+  }
+  if (deviceMatch.error) {
+    throw new Error(deviceMatch.error.message);
+  }
+
+  return Boolean(ipMatch.data || deviceMatch.data);
 }
 
 export async function recordTrialClaim(params: {
@@ -36,11 +57,18 @@ export async function recordTrialClaim(params: {
   deviceHash: string;
   orderId: string;
 }): Promise<void> {
-  await prisma.trialLog.create({
-    data: {
-      ipAddress: params.ipAddress,
-      deviceHash: params.deviceHash,
-      orderId: params.orderId,
-    },
+  const db = getSupabaseAdminResult();
+  if (!db.ok) {
+    throw new Error(db.error);
+  }
+
+  const { error } = await db.client.from("trial_logs").insert({
+    ip_address: params.ipAddress,
+    device_hash: params.deviceHash,
+    order_id: params.orderId,
   });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }

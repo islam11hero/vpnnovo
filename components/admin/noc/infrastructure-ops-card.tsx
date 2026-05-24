@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import {
   Gauge,
   Radar,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { queueInfrastructureOpAction } from "@/actions/infrastructure-ops";
 import { Switch } from "@/components/ui/switch";
 
 type ToggleDef = {
@@ -48,11 +49,20 @@ const TOGGLES: ToggleDef[] = [
 
 export function InfrastructureOpsCard() {
   const [state, setState] = useState<Record<string, boolean>>({});
+  const [isPending, startTransition] = useTransition();
 
   const flip = (id: string, next: boolean) => {
     setState((prev) => ({ ...prev, [id]: next }));
-    toast.message("Infrastructure feature queued for future SSH deployment", {
-      description: next ? "Toggle armed in UI preview." : "Toggle disarmed.",
+    if (!next) return;
+
+    startTransition(async () => {
+      const result = await queueInfrastructureOpAction(id);
+      if (result.success) {
+        toast.success(result.data?.message ?? "Action queued.");
+      } else {
+        toast.error(result.error);
+        setState((prev) => ({ ...prev, [id]: false }));
+      }
     });
   };
 
@@ -65,7 +75,7 @@ export function InfrastructureOpsCard() {
             Advanced Routing & Stealth Operations
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Visual prep for SSH/Xray fleet automation — no backend writes yet
+            Queued via secure webhooks — no direct SSH from serverless runtime
           </p>
         </div>
       </div>
@@ -92,6 +102,7 @@ export function InfrastructureOpsCard() {
               </div>
               <Switch
                 checked={checked}
+                disabled={isPending}
                 onCheckedChange={(v) => flip(toggle.id, v)}
                 aria-label={toggle.label}
               />

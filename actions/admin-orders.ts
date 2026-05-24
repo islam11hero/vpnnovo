@@ -3,12 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { actionErr, actionOk, type ActionResult } from "@/lib/actions-result";
-import {
-  executeMarzbanAdminAction,
-  getMarzbanAdminToken,
-  MarzbanError,
-} from "@/lib/marzban";
-import { marzbanFetch } from "@/lib/marzban-http";
+import { executeMarzbanAdminAction, MarzbanError } from "@/lib/marzban";
+import { marzbanFetchOrThrow } from "@/lib/marzban-client";
 import { resolveMarzbanUsername } from "@/lib/orders";
 import { isAdminAuthenticated } from "@/lib/require-admin";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
@@ -132,15 +128,10 @@ export async function instantRevokeOrderNode(
   }
 
   try {
-    const { token } = await getMarzbanAdminToken();
     const encoded = encodeURIComponent(username);
-    const putRes = await marzbanFetch(`/api/user/${encoded}`, {
+    const putRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
       method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "disabled" }),
     });
     if (!putRes.ok) {
@@ -193,15 +184,10 @@ export async function enforceSessionLimitOrderNode(
   }
 
   try {
-    const { token } = await getMarzbanAdminToken();
     const encoded = encodeURIComponent(username);
-    const putRes = await marzbanFetch(`/api/user/${encoded}`, {
+    const putRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
       method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ onlines_limit: 1 }),
     });
     if (!putRes.ok) {
@@ -284,15 +270,10 @@ export async function throttleOrderNode(orderId: string): Promise<ActionResult> 
   }
 
   try {
-    const { token } = await getMarzbanAdminToken();
     const encoded = encodeURIComponent(username);
-    const putRes = await marzbanFetch(`/api/user/${encoded}`, {
+    const putRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
       method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         note: "THROTTLED · 10Mbps cap (admin)",
       }),

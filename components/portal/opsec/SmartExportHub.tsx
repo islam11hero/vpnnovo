@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 
 import { OpsecCard } from "@/components/portal/opsec/opsec-card";
+import type { ProxyExtractSource } from "@/lib/marzban-proxy-extract";
 import {
-  buildAdsPowerProxyLine,
   buildClashYamlSnippet,
   buildRawVlessImportUri,
   buildSingboxYamlSnippet,
@@ -26,6 +26,10 @@ type ExportId = "adspower" | "clash" | "vless" | "qr";
 type Props = {
   vpnSubLink: string;
   vpnUsername: string;
+  /** Live SOCKS5/HTTP line or subscription fallback from Marzban `links`. */
+  adsPowerProxyLine: string;
+  proxyProtocolLabel?: string;
+  proxySource?: ProxyExtractSource;
 };
 
 const TABS: {
@@ -40,7 +44,20 @@ const TABS: {
   { id: "qr", label: "Mobile QR", emoji: "📱", icon: Smartphone },
 ];
 
-export function SmartExportHub({ vpnSubLink, vpnUsername }: Props) {
+const SOURCE_HINT: Record<ProxyExtractSource, string> = {
+  socks5: "Live SOCKS5 credentials from Marzban",
+  http: "Live HTTP proxy credentials from Marzban",
+  subscription: "Subscription URL — import in AdsPower as remote profile",
+  synthetic: "Host template — verify port with your node admin",
+};
+
+export function SmartExportHub({
+  vpnSubLink,
+  vpnUsername,
+  adsPowerProxyLine,
+  proxyProtocolLabel = "Proxy",
+  proxySource = "subscription",
+}: Props) {
   const [active, setActive] = useState<ExportId>("adspower");
   const [copiedId, setCopiedId] = useState<ExportId | null>(null);
 
@@ -48,18 +65,24 @@ export function SmartExportHub({ vpnSubLink, vpnUsername }: Props) {
     (id: ExportId): string => {
       switch (id) {
         case "adspower":
-          return buildAdsPowerProxyLine(vpnSubLink, vpnUsername);
+          return adsPowerProxyLine;
         case "clash":
-          return `${buildClashYamlSnippet(vpnSubLink)}\n\n${buildSingboxYamlSnippet(vpnSubLink)}`;
+          return vpnSubLink
+            ? `${buildClashYamlSnippet(vpnSubLink)}\n\n${buildSingboxYamlSnippet(vpnSubLink)}`
+            : "Subscription link required for Clash export.";
         case "vless":
-          return buildRawVlessImportUri(vpnSubLink);
+          return vpnSubLink
+            ? buildRawVlessImportUri(vpnSubLink)
+            : adsPowerProxyLine;
         case "qr":
-          return buildVisionSubscriptionUrl(vpnSubLink);
+          return vpnSubLink
+            ? buildVisionSubscriptionUrl(vpnSubLink)
+            : adsPowerProxyLine;
         default:
-          return vpnSubLink;
+          return adsPowerProxyLine;
       }
     },
-    [vpnSubLink, vpnUsername],
+    [adsPowerProxyLine, vpnSubLink],
   );
 
   const handleCopy = async (id: ExportId) => {
@@ -87,6 +110,10 @@ export function SmartExportHub({ vpnSubLink, vpnUsername }: Props) {
       accent="cyan"
       className="col-span-full"
     >
+      <p className="mb-4 text-xs font-medium text-slate-500">
+        {proxyProtocolLabel} · {SOURCE_HINT[proxySource]}
+        {vpnUsername ? ` · ${vpnUsername}` : ""}
+      </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {TABS.map((tab) => {
           const Icon = tab.icon;
@@ -150,7 +177,7 @@ export function SmartExportHub({ vpnSubLink, vpnUsername }: Props) {
           <p className="mb-2 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
             {activeTab.emoji} {activeTab.label} preview
           </p>
-          <pre className="max-h-40 overflow-auto rounded-lg border border-slate-800 bg-black/50 p-4 font-mono text-[11px] leading-relaxed text-cyan-100/90 whitespace-pre-wrap break-all">
+          <pre className="max-h-40 overflow-auto rounded-lg border border-slate-800 bg-black/50 p-4 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all text-cyan-100/90">
             {preview}
           </pre>
           <button

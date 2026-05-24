@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { MarzbanError, revokeAndRefreshMarzbanSubscription } from "@/lib/marzban";
-import { isValidUuid } from "@/lib/uuid";
+import { assertOrderAccess } from "@/lib/order-access";
 import { jsonError } from "@/lib/api/json-error";
+import { MarzbanError, revokeAndRefreshMarzbanSubscription } from "@/lib/marzban";
+import { resolveMarzbanUsername } from "@/lib/orders";
+import { isValidUuid } from "@/lib/uuid";
 import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
 export const runtime = "nodejs";
@@ -33,9 +35,14 @@ export async function POST(request: Request) {
     return jsonError("Invalid or missing order_id", 400);
   }
 
+  const access = await assertOrderAccess(order_id);
+  if (!access.ok) {
+    return jsonError(access.error, access.status);
+  }
+
   const { data: order, error: fetchError } = await db.client
     .from("orders")
-    .select("id, status, vpn_username")
+    .select("id, status, vpn_username, marzban_username")
     .eq("id", order_id)
     .maybeSingle();
 
@@ -47,7 +54,7 @@ export async function POST(request: Request) {
     return jsonError("Only active paid shields can revoke credentials", 400);
   }
 
-  const vpnUsername = order.vpn_username as string | null;
+  const vpnUsername = resolveMarzbanUsername(order);
   if (!vpnUsername) {
     return jsonError("VPN user not provisioned yet", 400);
   }

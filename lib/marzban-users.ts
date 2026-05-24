@@ -23,14 +23,11 @@ export function normalizeMarzbanUsers(payload: unknown): MarzbanUser[] {
   return [];
 }
 
+import { formatBytes } from "@/lib/formatters";
+
+/** @deprecated Use `formatBytes` from `@/lib/formatters`. */
 export function formatTraffic(bytes: number): string {
-  if (!bytes || bytes <= 0) return "0 B";
-  const gb = bytes / 1073741824;
-  if (gb >= 1024) return `${(gb / 1024).toFixed(2)} TB`;
-  if (gb >= 1) return `${gb.toFixed(2)} GB`;
-  const mb = bytes / 1048576;
-  if (mb >= 1) return `${mb.toFixed(1)} MB`;
-  return `${(bytes / 1024).toFixed(0)} KB`;
+  return formatBytes(bytes);
 }
 
 export function trafficToGb(bytes: number): number {
