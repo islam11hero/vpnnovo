@@ -82,7 +82,7 @@ export function ClientHandoffPanel({
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
   const loginUrl = origin ? `${origin}/login?key=${accessCode}` : "";
-  const qrValue = subLink.trim() || portalLink;
+  const qrValue = subLink.trim() || portalLink.trim();
 
   const copyAll = async () => {
     const text = buildVipHandoffClipboardText({

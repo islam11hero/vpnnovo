@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { jsonError } from "@/lib/api/json-error";
 import { MarzbanError, provisionTrialMarzbanUser } from "@/lib/marzban";
+import { updateOrderVpnFields } from "@/lib/order-vpn-update";
 import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 import {
   hasTrialAbuseRecord,
@@ -85,16 +86,14 @@ export async function POST(request: Request) {
   try {
     const { username, sub_link } = await provisionTrialMarzbanUser(orderId);
 
-    const { error: updateError } = await db.client
-      .from("orders")
-      .update({
-        vpn_username: username,
-        vpn_sub_link: sub_link,
-      })
-      .eq("id", orderId);
+    const updateResult = await updateOrderVpnFields(db.client, orderId, {
+      username,
+      subLink: sub_link,
+      status: "paid",
+    });
 
-    if (updateError) {
-      throw new Error(updateError.message);
+    if (!updateResult.ok) {
+      throw new Error(updateResult.error);
     }
 
     try {

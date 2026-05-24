@@ -7,8 +7,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { SupabaseOrder } from "@/lib/supabase/types";
 import { isValidUuid } from "@/lib/uuid";
 
-export const PORTAL_ORDER_COOKIE = "ipnova_portal_order";
-const PORTAL_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+import {
+  PORTAL_COOKIE_MAX_AGE,
+  PORTAL_ORDER_COOKIE,
+} from "@/lib/portal-cookie-constants";
+
+export { PORTAL_ORDER_COOKIE } from "@/lib/portal-cookie-constants";
 
 export type OrderAccessResult =
   | { ok: true; via: "user" | "portal" | "admin" }

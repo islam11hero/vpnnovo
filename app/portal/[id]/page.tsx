@@ -8,7 +8,6 @@ import {
 import { ClientDashboard } from "@/components/portal/ClientDashboard";
 import { RefreshButton } from "@/components/portal/RefreshButton";
 import { loadOrderDashboardPayload } from "@/lib/client-dashboard-loader";
-import { setPortalOrderCookie } from "@/lib/order-access";
 import { isValidUuid } from "@/lib/uuid";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
 import { getSystemConfigFlags } from "@/lib/system-config";
@@ -204,7 +203,6 @@ export default async function PortalDashboardPage({ params }: Props) {
   }
 
   if (row.status === "paid") {
-    setPortalOrderCookie(orderId);
     const payload = await loadOrderDashboardPayload(row);
     return (
       <ClientDashboard

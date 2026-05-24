@@ -18,6 +18,11 @@ export function normalizeDeviceHash(raw: unknown): string | null {
   return hash;
 }
 
+function isMissingTrialLogsTable(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("trial_logs") && lower.includes("schema cache");
+}
+
 export async function hasTrialAbuseRecord(
   ipAddress: string,
   deviceHash: string,
@@ -43,9 +48,17 @@ export async function hasTrialAbuseRecord(
   ]);
 
   if (ipMatch.error) {
+    if (isMissingTrialLogsTable(ipMatch.error.message)) {
+      console.warn("[trial] trial_logs table missing — skipping abuse check");
+      return false;
+    }
     throw new Error(ipMatch.error.message);
   }
   if (deviceMatch.error) {
+    if (isMissingTrialLogsTable(deviceMatch.error.message)) {
+      console.warn("[trial] trial_logs table missing — skipping abuse check");
+      return false;
+    }
     throw new Error(deviceMatch.error.message);
   }
 
@@ -69,6 +82,10 @@ export async function recordTrialClaim(params: {
   });
 
   if (error) {
+    if (isMissingTrialLogsTable(error.message)) {
+      console.warn("[trial] trial_logs table missing — claim not logged");
+      return;
+    }
     throw new Error(error.message);
   }
 }

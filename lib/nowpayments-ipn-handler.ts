@@ -13,6 +13,7 @@ import {
   parseVipNowPaymentsOrderId,
 } from "@/lib/nowpayments-order-id";
 import { resolveMarzbanUsername } from "@/lib/orders";
+import { updateOrderVpnFields } from "@/lib/order-vpn-update";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SupabaseOrder } from "@/lib/supabase/types";
 
@@ -219,22 +220,18 @@ export async function processNowPaymentsIpn(
       sub_link = provisioned.sub_link;
     }
 
-    const { error: updateError } = await client
-      .from("orders")
-      .update({
-        status: "paid",
-        user_id: order.user_id ?? resolved.userId ?? null,
-        vpn_username: username,
-        marzban_username: username,
-        vpn_sub_link: sub_link,
-        payment_currency: paymentCurrency,
-        tx_hash: txHash,
-        payment_provider: "nowpayments",
-      })
-      .eq("id", resolved.dbOrderId);
+    const updateResult = await updateOrderVpnFields(client, resolved.dbOrderId, {
+      username,
+      subLink: sub_link,
+      status: "paid",
+      userId: order.user_id ?? resolved.userId ?? null,
+      paymentCurrency: paymentCurrency,
+      txHash: txHash,
+      paymentProvider: "nowpayments",
+    });
 
-    if (updateError) {
-      console.error(`${logPrefix} Supabase update failed:`, updateError.message);
+    if (!updateResult.ok) {
+      console.error(`${logPrefix} Supabase update failed:`, updateResult.error);
       return {
         status: 500,
         body: { error: "Order update failed" },

@@ -42,33 +42,64 @@ export function addCalendarMonthsUnix(fromSec: number, months: number): number {
   return Math.floor(d.getTime() / 1000);
 }
 
+/** Live panel inbound tag — must match Marzban Host settings exactly. */
+export function resolveMarzbanVlessInboundTag(): string {
+  const fromEnv = process.env.MARZBAN_VLESS_INBOUND?.trim();
+  return fromEnv || "VLESS TCP REALITY";
+}
+
+export type MarzbanCreateUserPayload = {
+  username: string;
+  proxies: { vless: Record<string, never> };
+  inbounds: { vless: string[] };
+  expire: number;
+  data_limit: number;
+  data_limit_reset_strategy: "no_reset";
+  status: "active";
+  note?: string;
+};
+
+function buildMarzbanCreateUserCore(input: {
+  username: string;
+  expire: number;
+  data_limit: number;
+  note?: string;
+}): MarzbanCreateUserPayload {
+  const note = input.note?.trim();
+  return {
+    username: input.username.trim(),
+    proxies: { vless: {} },
+    inbounds: { vless: [resolveMarzbanVlessInboundTag()] },
+    expire: input.expire,
+    data_limit: input.data_limit,
+    data_limit_reset_strategy: "no_reset",
+    status: "active",
+    ...(note ? { note } : {}),
+  };
+}
+
 /**
- * POST /api/user — strict payload only. Never send `proxies`, `inbounds`, or other
- * empty config objects; Marzban FastAPI expects these keys omitted to use panel defaults.
+ * POST /api/user — requires `proxies.vless` + explicit inbound or subscription/QR stay empty.
  */
 export function buildMarzbanCreateUserBody(input: {
   username: string;
   durationMonths: number;
   dataCapGB: number;
-}): {
-  username: string;
-  expire: number;
-  data_limit: number;
-  data_limit_reset_strategy: "no_reset";
-} {
+  note?: string;
+}): MarzbanCreateUserPayload {
   const durationMonths = Math.floor(Number(input.durationMonths));
   const dataCapGB = Number(input.dataCapGB);
 
-  return {
-    username: input.username.trim(),
+  return buildMarzbanCreateUserCore({
+    username: input.username,
     expire:
       durationMonths > 0
         ? addCalendarMonthsUnix(Math.floor(Date.now() / 1000), durationMonths)
         : 0,
     data_limit:
       dataCapGB > 0 ? Math.floor(dataCapGB * MARZBAN_GB_BYTES) : 0,
-    data_limit_reset_strategy: "no_reset",
-  };
+    note: input.note,
+  });
 }
 
 /** Omit keys that break Marzban when sent as empty objects on PUT. */
@@ -81,23 +112,19 @@ export function omitMarzbanProxyFields<T extends Record<string, unknown>>(
   return rest;
 }
 
-/** Build create payload from explicit expire timestamp (paid checkout flows). */
+/** Build create payload from explicit expire timestamp (paid checkout / trial flows). */
 export function buildMarzbanCreateUserBodyWithExpire(input: {
   username: string;
   expire: number;
   data_limit?: number;
-}): {
-  username: string;
-  expire: number;
-  data_limit: number;
-  data_limit_reset_strategy: "no_reset";
-} {
-  return {
-    username: input.username.trim(),
+  note?: string;
+}): MarzbanCreateUserPayload {
+  return buildMarzbanCreateUserCore({
+    username: input.username,
     expire: input.expire,
     data_limit: input.data_limit ?? 0,
-    data_limit_reset_strategy: "no_reset",
-  };
+    note: input.note,
+  });
 }
 
 export function parseMarzbanErrorText(raw: string): string {
@@ -427,6 +454,7 @@ export async function provisionManualMarzbanUser(params: {
     username,
     durationMonths: params.months,
     dataCapGB: params.dataLimitGb,
+    note: `VIP Free · ${planName}`,
   });
 
   const createRes = await marzbanFetchJson<Record<string, unknown>>("/api/user", {

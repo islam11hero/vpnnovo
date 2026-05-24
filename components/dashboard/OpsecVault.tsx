@@ -14,6 +14,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { ClientAccessHub } from "@/components/portal/ClientAccessHub";
 import { ExpiryCalendarButton } from "@/components/portal/ExpiryCalendarButton";
 import { LiveNetworkStatus } from "@/components/portal/LiveNetworkStatus";
 import { PanicRevokeButton } from "@/components/portal/PanicRevokeButton";
@@ -133,7 +134,9 @@ export function OpsecVault({
   walletBalanceUsd = 0,
   showFinancialHub = true,
 }: OpsecVaultProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [activeTab, setActiveTab] = useState<TabId>(
+    showFinancialHub ? "overview" : "connection",
+  );
   const initialSub =
     subscriptionUrl ?? order.vpn_sub_link ?? telemetry?.subscriptionUrl ?? "";
   const [liveSubLink, setLiveSubLink] = useState(initialSub);
@@ -237,6 +240,11 @@ export function OpsecVault({
                   orderId={order.id}
                 />
               ) : null}
+              <ClientAccessHub
+                orderId={order.id}
+                subLink={subLink}
+                username={displayUsername}
+              />
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <TimezoneAuditor />
                 <WebRTCLeakShield />
@@ -331,6 +339,11 @@ export function OpsecVault({
 
           {activeTab === "connection" && (
             <div className="space-y-6">
+              <ClientAccessHub
+                orderId={order.id}
+                subLink={subLink}
+                username={displayUsername}
+              />
               {subLink || adsPowerProxy.line ? (
                 <SmartExportHub
                   vpnSubLink={subLink}
@@ -339,13 +352,7 @@ export function OpsecVault({
                   proxyProtocolLabel={adsPowerProxy.protocolLabel}
                   proxySource={adsPowerProxy.source}
                 />
-              ) : (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-8 text-center backdrop-blur-md">
-                  <p className="text-sm font-medium text-slate-500">
-                    Subscription link is still provisioning. Check back shortly.
-                  </p>
-                </div>
-              )}
+              ) : null}
             </div>
           )}
 

@@ -4,6 +4,7 @@ import type Stripe from "stripe";
 
 import { provisionPaidOrderOnMarzban } from "@/lib/marzban-fulfillment";
 import { MarzbanError } from "@/lib/marzban-error";
+import { updateOrderVpnFields } from "@/lib/order-vpn-update";
 import { resolveStripePlanFromSession } from "@/lib/stripe-plan-map";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -99,22 +100,19 @@ export async function fulfillStripeCheckoutSession(
       orderId,
     );
 
-    const { error: updateError } = await client
-      .from("orders")
-      .update({
-        status: "paid",
-        vpn_username: username,
-        marzban_username: username,
-        vpn_sub_link: sub_link,
-        payment_currency: "stripe",
-        tx_hash: session.payment_intent
-          ? String(session.payment_intent)
-          : sessionId,
-      })
-      .eq("id", orderId);
+    const updateResult = await updateOrderVpnFields(client, orderId, {
+      username,
+      subLink: sub_link,
+      status: "paid",
+      paymentCurrency: "stripe",
+      txHash: session.payment_intent
+        ? String(session.payment_intent)
+        : sessionId,
+      paymentProvider: "stripe",
+    });
 
-    if (updateError) {
-      throw new Error(updateError.message);
+    if (!updateResult.ok) {
+      throw new Error(updateResult.error);
     }
 
     void customerEmail;

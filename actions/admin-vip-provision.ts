@@ -9,6 +9,7 @@ import { MarzbanError, provisionManualMarzbanUser } from "@/lib/marzban";
 import { extractMarzbanSubscriptionFromPayload } from "@/lib/marzban-subscription";
 import { getMarzbanApiUrl, marzbanFetchJson } from "@/lib/marzban-client";
 import { resolvePortalUrl } from "@/lib/vip-handoff";
+import { updateOrderVpnFields } from "@/lib/order-vpn-update";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
 import { isAdminAuthenticated } from "@/lib/require-admin";
 import { VIP_FREE_PLAN_NAME } from "@/lib/vip-constants";
@@ -139,18 +140,15 @@ export async function provisionFreeVipClientAction(input: {
       sub_link?.trim() ||
       (await fetchSubLinkAfterCreate(username, createPayload));
 
-    const { error: updateError } = await db.client
-      .from("orders")
-      .update({
-        vpn_username: username,
-        marzban_username: username,
-        vpn_sub_link: isPendingSubLink(subLink) ? null : subLink,
-      })
-      .eq("id", orderId);
+    const updateResult = await updateOrderVpnFields(db.client, orderId, {
+      username,
+      subLink: isPendingSubLink(subLink) ? null : subLink,
+      status: "paid",
+    });
 
-    if (updateError) {
+    if (!updateResult.ok) {
       return actionErr(
-        updateError.message ??
+        updateResult.error ??
           "Marzban user created but Supabase update failed. Check panel manually.",
       );
     }

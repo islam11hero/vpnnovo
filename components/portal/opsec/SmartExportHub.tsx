@@ -19,7 +19,6 @@ import {
   buildRawVlessImportUri,
   buildSingboxYamlSnippet,
 } from "@/lib/opsec-export";
-import { buildVisionSubscriptionUrl } from "@/lib/protocol-links";
 
 type ExportId = "adspower" | "clash" | "vless" | "qr";
 
@@ -75,9 +74,7 @@ export function SmartExportHub({
             ? buildRawVlessImportUri(vpnSubLink)
             : adsPowerProxyLine;
         case "qr":
-          return vpnSubLink
-            ? buildVisionSubscriptionUrl(vpnSubLink)
-            : adsPowerProxyLine;
+          return vpnSubLink || adsPowerProxyLine;
         default:
           return adsPowerProxyLine;
       }
