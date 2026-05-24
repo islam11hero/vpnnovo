@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 
 import { CreateVipDialog } from "@/components/admin/CreateVipDialog";
 
 export function ClientsPageHeader() {
+  const router = useRouter();
   const [vipOpen, setVipOpen] = useState(false);
 
   return (
@@ -36,7 +38,7 @@ export function ClientsPageHeader() {
       <CreateVipDialog
         open={vipOpen}
         onClose={() => setVipOpen(false)}
-        onCreated={() => setVipOpen(false)}
+        onCreated={() => router.refresh()}
       />
     </>
   );

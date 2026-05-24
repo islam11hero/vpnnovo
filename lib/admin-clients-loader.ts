@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { ClientCommandRow } from "@/lib/marzban/users-bulk";
+import type { ClientCommandRow, MarzbanUserRecord } from "@/lib/marzban/users-bulk";
 import {
   cachedRowToMarzbanUser,
   fetchAllMarzbanUsers,
@@ -12,7 +12,31 @@ import {
   readCachedTelemetry,
 } from "@/lib/orders-telemetry-cache";
 import { resolveMarzbanUsername } from "@/lib/orders";
+import { resolvePortalUrl } from "@/lib/vip-handoff";
 import type { SupabaseOrder } from "@/lib/supabase/types";
+
+function resolveRowSubLink(
+  order: SupabaseOrder | undefined,
+  user: Pick<MarzbanUserRecord, "subscription_url" | "links">,
+): string {
+  const fromOrder = order?.vpn_sub_link?.trim();
+  if (fromOrder) return fromOrder;
+  const fromMarzban = user.subscription_url?.trim();
+  if (fromMarzban) return fromMarzban;
+  return user.links[0]?.trim() ?? "";
+}
+
+function handoffFields(
+  order: SupabaseOrder | undefined,
+  user: Pick<MarzbanUserRecord, "subscription_url" | "links">,
+) {
+  const orderId = order?.id;
+  return {
+    orderId,
+    portalLink: orderId ? resolvePortalUrl(orderId) : undefined,
+    vpnSubLink: resolveRowSubLink(order, user) || null,
+  };
+}
 
 export type AdminClientsTelemetryPayload = {
   rows: ClientCommandRow[];
@@ -35,7 +59,7 @@ function buildCachedRows(orders: SupabaseOrder[]): ClientCommandRow[] {
 
     rows.push({
       ...user,
-      orderId: order.id,
+      ...handoffFields(order, user),
       telemetryLive: false,
       telemetryDelayed: true,
     });
@@ -69,7 +93,7 @@ function mergeLiveWithCache(
     const order = orderByUsername.get(user.username);
     return {
       ...user,
-      orderId: order?.id,
+      ...handoffFields(order, user),
       telemetryLive: true,
       telemetryDelayed: false,
     };
@@ -82,7 +106,7 @@ function mergeLiveWithCache(
     const cache = readCachedTelemetry(order);
     rows.push({
       ...cachedRowToMarzbanUser(username, cache),
-      orderId: order.id,
+      ...handoffFields(order, cachedRowToMarzbanUser(username, cache)),
       telemetryLive: false,
       telemetryDelayed: true,
     });

@@ -5,6 +5,7 @@ import {
   Ban,
   CheckCircle2,
   Copy,
+  KeyRound,
   Loader2,
   Pencil,
   RefreshCw,
@@ -23,6 +24,7 @@ import {
   copyMarzbanSubLinkAction,
   deleteMarzbanUserAction,
 } from "@/actions/marzban-users";
+import { ClientHandoffDialog } from "@/components/admin/clients/client-handoff-dialog";
 import { TelemetryDelayedBadge } from "@/components/admin/clients/telemetry-delayed-badge";
 import { ConfirmDestructiveDialog } from "@/components/admin/noc/confirm-destructive-dialog";
 import { NocEmptyState } from "@/components/admin/noc/noc-empty-state";
@@ -109,6 +111,9 @@ function promptDataLimitGb(): number | null {
 export function ClientCommandTable({ rows }: Props) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [handoffTarget, setHandoffTarget] = useState<ClientCommandRow | null>(
+    null,
+  );
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -188,6 +193,7 @@ export function ClientCommandTable({ rows }: Props) {
             <thead>
               <tr className="border-b border-slate-800 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
                 <th className="px-5 py-3">🛡️ Shield ID</th>
+                <th className="px-5 py-3">🔑 Order ID</th>
                 <th className="px-5 py-3">🚦 Status</th>
                 <th className="px-5 py-3">📊 Bandwidth Burn</th>
                 <th className="px-5 py-3">⏳ Expiry</th>
@@ -214,6 +220,24 @@ export function ClientCommandTable({ rows }: Props) {
                           <TelemetryDelayedBadge />
                         </div>
                       ) : null}
+                    </td>
+                    <td className="px-5 py-4">
+                      {user.orderId ? (
+                        <button
+                          type="button"
+                          onClick={() => setHandoffTarget(user)}
+                          className="group text-left"
+                        >
+                          <p className="font-mono text-xs font-bold text-cyan-300 group-hover:underline">
+                            {user.orderId.slice(0, 8)}…
+                          </p>
+                          <p className="mt-0.5 text-[10px] font-bold text-slate-500 uppercase group-hover:text-cyan-500">
+                            View handoff
+                          </p>
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-600">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       <span
@@ -255,6 +279,17 @@ export function ClientCommandTable({ rows }: Props) {
                           <p className="border-b border-slate-800 px-4 py-2 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
                             Manage
                           </p>
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-900"
+                            onClick={() => {
+                              setOpenMenu(null);
+                              setHandoffTarget(user);
+                            }}
+                          >
+                            <KeyRound className="h-3.5 w-3.5 text-violet-400" />
+                            📋 Order ID · QR · Links
+                          </button>
                           <button
                             type="button"
                             className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-semibold text-slate-200 hover:bg-slate-900"
@@ -375,6 +410,21 @@ export function ClientCommandTable({ rows }: Props) {
           </table>
         </div>
       </div>
+
+      <ClientHandoffDialog
+        open={Boolean(handoffTarget)}
+        onClose={() => setHandoffTarget(null)}
+        accessCode={handoffTarget?.orderId ?? ""}
+        username={handoffTarget?.username ?? ""}
+        subLink={handoffTarget?.vpnSubLink ?? ""}
+        portalLink={
+          handoffTarget?.portalLink ??
+          (handoffTarget?.orderId
+            ? `${typeof window !== "undefined" ? window.location.origin : ""}/portal/${handoffTarget.orderId}`
+            : "")
+        }
+        message="Client handoff"
+      />
 
       <ConfirmDestructiveDialog
         open={Boolean(deleteTarget)}

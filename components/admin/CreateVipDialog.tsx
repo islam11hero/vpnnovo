@@ -1,19 +1,11 @@
 "use client";
 
 import { FormEvent, useState, useTransition } from "react";
-import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  Copy,
-  Crown,
-  Loader2,
-  X,
-} from "lucide-react";
+import { AlertCircle, Crown, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { provisionFreeVipClientAction } from "@/actions/admin-vip-provision";
-import { buildVipHandoffClipboardText } from "@/lib/vip-handoff";
+import { ClientHandoffPanel } from "@/components/admin/clients/client-handoff-panel";
 import { validateMarzbanUsername } from "@/lib/marzban-validation";
 
 type Props = {
@@ -27,7 +19,6 @@ type SuccessData = {
   subLink: string;
   username: string;
   message: string;
-  clientLink: string;
   portalLink: string;
 };
 
@@ -37,7 +28,6 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
   const [dataLimitGb, setDataLimitGb] = useState(100);
   const [successData, setSuccessData] = useState<SuccessData | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [copiedHandoff, setCopiedHandoff] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   if (!open) return null;
@@ -48,7 +38,6 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
     setDataLimitGb(100);
     setSuccessData(null);
     setFormError(null);
-    setCopiedHandoff(false);
   };
 
   const handleClose = () => {
@@ -96,44 +85,13 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
         subLink: result.data.subLink,
         username: result.data.username,
         message: result.data.message,
-        clientLink: result.data.clientLink,
         portalLink: result.data.portalLink,
       });
       onCreated();
       toast.success(result.data.message, {
-        description: `${result.data.username} · handoff ready`,
+        description: "Order ID, QR, and links are ready below.",
       });
     });
-  };
-
-  const loginHandoffUrl =
-    typeof window !== "undefined" && successData
-      ? `${window.location.origin}/login?key=${successData.accessCode}`
-      : "";
-
-  const copyHandoffMessage = async () => {
-    if (!successData) return;
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "";
-    const text = buildVipHandoffClipboardText({
-      accessCode: successData.accessCode,
-      subLink: successData.subLink,
-      username: successData.username,
-      origin,
-    });
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedHandoff(true);
-      toast.success("Handoff message copied", {
-        description: "Magic login URL + subscription link ready for WhatsApp.",
-      });
-      setTimeout(() => setCopiedHandoff(false), 2500);
-    } catch {
-      toast.error("Clipboard blocked", {
-        description: "Select the fields and copy manually.",
-      });
-    }
   };
 
   return (
@@ -144,7 +102,7 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={handleClose}
       />
-      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-950 p-8 shadow-2xl shadow-black/50">
+      <div className="relative z-10 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-8 shadow-2xl shadow-black/50">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-500/30 bg-violet-500/10">
@@ -155,7 +113,7 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
                 Free VIP Client Provisioning
               </h2>
               <p className="text-xs text-slate-500">
-                Marzban + Supabase · $0.00 revenue · instant dashboard access
+                Marzban + Supabase · $0.00 revenue · instant handoff
               </p>
             </div>
           </div>
@@ -170,80 +128,14 @@ export function CreateVipDialog({ open, onClose, onCreated }: Props) {
         </div>
 
         {successData ? (
-          <div className="space-y-5">
-            <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 via-slate-950 to-slate-950 p-6">
-              <div className="text-center">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10 shadow-[0_0_32px_rgba(16,185,129,0.25)]">
-                  <CheckCircle2 className="h-10 w-10 text-emerald-400" />
-                </div>
-                <p className="mt-4 text-sm font-bold tracking-widest text-emerald-400 uppercase">
-                  {successData.message}
-                </p>
-                <p className="mt-2 font-mono text-lg font-bold text-white">
-                  {successData.username}
-                </p>
-              </div>
-
-              <div className="mt-6 space-y-4">
-                <div>
-                  <p className="mb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
-                    Order ID / Access Code
-                  </p>
-                  <p className="break-all rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-sm font-bold text-cyan-300">
-                    {successData.accessCode}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="mb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
-                    Direct Node Link
-                  </p>
-                  <input
-                    readOnly
-                    value={successData.subLink}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-xs text-violet-300/90 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <p className="mb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
-                    Instant Portal (no login)
-                  </p>
-                  <input
-                    readOnly
-                    value={successData.portalLink}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-xs text-cyan-300/90 focus:outline-none"
-                  />
-                </div>
-
-                {loginHandoffUrl ? (
-                  <div>
-                    <p className="mb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase">
-                      Magic login URL
-                    </p>
-                    <input
-                      readOnly
-                      value={loginHandoffUrl}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-mono text-xs text-slate-400 focus:outline-none"
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => void copyHandoffMessage()}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/50 bg-emerald-600 py-4 text-base font-black tracking-wide text-white uppercase shadow-lg shadow-emerald-900/30 hover:bg-emerald-500"
-            >
-              {copiedHandoff ? (
-                <Check className="h-5 w-5" />
-              ) : (
-                <Copy className="h-5 w-5" />
-              )}
-              {copiedHandoff ? "Copied!" : "Copy Handoff Message"}
-            </button>
-
+          <div className="space-y-4">
+            <ClientHandoffPanel
+              accessCode={successData.accessCode}
+              username={successData.username}
+              subLink={successData.subLink}
+              portalLink={successData.portalLink}
+              message={successData.message}
+            />
             <button
               type="button"
               onClick={handleClose}

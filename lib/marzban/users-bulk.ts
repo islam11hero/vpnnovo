@@ -23,6 +23,8 @@ export type MarzbanUserRecord = {
 
 export type ClientCommandRow = MarzbanUserRecord & {
   orderId?: string;
+  portalLink?: string;
+  vpnSubLink?: string | null;
   telemetryLive: boolean;
   telemetryDelayed: boolean;
 };
