@@ -20,7 +20,16 @@ export const TICKET_SUBJECTS = [
   "Connection Issues",
   "Speed / Latency",
   "Billing Question",
+  "Proxy delivery / credentials",
   "Technical Integration",
   "Account Access",
   "Other",
 ] as const;
+
+export function isTicketAwaitingReply(ticket: Pick<SupportTicket, "status" | "admin_reply">): boolean {
+  return !ticket.admin_reply && (ticket.status === "open" || ticket.status === "pending");
+}
+
+export function isTicketAnswered(ticket: Pick<SupportTicket, "admin_reply">): boolean {
+  return Boolean(ticket.admin_reply?.trim());
+}

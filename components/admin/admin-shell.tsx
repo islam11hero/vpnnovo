@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 
+import { AdminMobileNav } from "@/components/admin/AdminMobileNav";
 import { AdminHeaderSearch } from "@/components/admin/admin-header-search";
 import { AdminSearchProvider } from "@/components/admin/admin-search-context";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
@@ -43,6 +44,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </header>
+
+          <AdminMobileNav />
 
           <main className="flex-1 overflow-y-auto bg-slate-950 p-6 md:p-8">
             {children}

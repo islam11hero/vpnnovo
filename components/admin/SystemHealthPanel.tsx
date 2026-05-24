@@ -4,21 +4,50 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Activity,
   CheckCircle2,
-  Globe,
+  Database,
   Loader2,
   Server,
-  Shield,
   XCircle,
 } from "lucide-react";
+
+type TableCheck = {
+  table: string;
+  ok: boolean;
+  error?: string;
+};
 
 type HealthData = {
   isSupabaseConfigured: boolean;
   isMarzbanConfigured: boolean;
   marzban_online: boolean;
   site_url: string;
-  admin_edge_auth: boolean;
-  zero_log_tickets: boolean;
+  nowpayments_configured: boolean;
+  database_schema_ok: boolean;
+  orders_telemetry_columns: boolean;
+  database_tables: TableCheck[];
+  database_error: string | null;
 };
+
+function StatusPill({
+  ok,
+  label,
+}: {
+  ok: boolean;
+  label: string;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${
+        ok
+          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+          : "border-red-500/40 bg-red-500/10 text-red-300"
+      }`}
+    >
+      {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+      {label}
+    </span>
+  );
+}
 
 export function SystemHealthPanel() {
   const [data, setData] = useState<HealthData | null>(null);
@@ -51,135 +80,118 @@ export function SystemHealthPanel() {
 
   if (loading) {
     return (
-      <div className="flex justify-center rounded-3xl border border-slate-200/60 bg-white/90 py-24 backdrop-blur-sm">
-        <Loader2 className="h-10 w-10 animate-spin text-[#3B82F6]" />
+      <div className="flex justify-center rounded-2xl border border-slate-800 bg-slate-950/60 py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-cyan-400" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-700">
+        <div className="rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-300">
           {error}
         </div>
       ) : null}
 
-      <div className="rounded-3xl border border-slate-200/60 bg-white/90 p-8 shadow-sm backdrop-blur-sm">
-        <div className="mb-8 flex items-center gap-3">
-          <Activity className="h-7 w-7 text-[#3B82F6]" />
-          <div>
-            <h2 className="text-lg font-bold text-slate-800">
-              Diagnostics &amp; Security
-            </h2>
-            <p className="text-sm text-slate-500">
-              Live infrastructure status for the Command Center
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-6 grid gap-3 sm:grid-cols-2">
-          <span
-            className={`rounded-xl border px-4 py-3 text-xs font-bold ${
-              data?.isSupabaseConfigured
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-amber-200 bg-amber-50 text-amber-900"
-            }`}
-          >
-            Supabase admin:{" "}
-            {data?.isSupabaseConfigured ? "Configured" : "Missing"}
-          </span>
-          <span
-            className={`rounded-xl border px-4 py-3 text-xs font-bold ${
-              data?.isMarzbanConfigured
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-amber-200 bg-amber-50 text-amber-900"
-            }`}
-          >
-            Marzban API: {data?.isMarzbanConfigured ? "Configured" : "Missing"}
-          </span>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6">
-            <div className="mb-3 flex items-center gap-2">
-              <Server className="h-5 w-5 text-slate-500" />
-              <p className="text-sm font-bold text-slate-800">
-                Marzban API Connection
+      <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-6">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Activity className="h-6 w-6 text-cyan-400" />
+            <div>
+              <h2 className="font-poppins text-lg font-bold text-white">
+                Production diagnostics
+              </h2>
+              <p className="text-xs text-slate-500">
+                Env vars + database schema (run after Vercel redeploy)
               </p>
             </div>
-            {!data?.isMarzbanConfigured ? (
-              <span className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-800">
-                Not configured on server
-              </span>
-            ) : data?.marzban_online ? (
-              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-700">
-                <CheckCircle2 className="h-4 w-4" />
-                Online
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-2 rounded-full bg-red-100 px-4 py-2 text-sm font-bold text-red-700">
-                <XCircle className="h-4 w-4" />
-                Offline
-              </span>
-            )}
           </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6">
-            <div className="mb-3 flex items-center gap-2">
-              <Globe className="h-5 w-5 text-slate-500" />
-              <p className="text-sm font-bold text-slate-800">Site URL Config</p>
-            </div>
-            <p className="break-all font-mono text-sm font-medium text-slate-700">
-              {data?.site_url ?? "—"}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-6 md:col-span-2">
-            <div className="mb-4 flex items-center gap-2">
-              <Shield className="h-5 w-5 text-slate-500" />
-              <p className="text-sm font-bold text-slate-800">Security Check</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <span
-                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold ${
-                  data?.admin_edge_auth
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-red-100 text-red-700"
-                }`}
-              >
-                {data?.admin_edge_auth ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                ) : (
-                  <XCircle className="h-3.5 w-3.5" />
-                )}
-                Admin Edge Auth Active
-              </span>
-              <span
-                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold ${
-                  data?.zero_log_tickets
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-red-100 text-red-700"
-                }`}
-              >
-                {data?.zero_log_tickets ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                ) : (
-                  <XCircle className="h-3.5 w-3.5" />
-                )}
-                Zero-Log Tickets Active
-              </span>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300 hover:border-cyan-500/40 hover:text-cyan-400"
+          >
+            Refresh
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="mt-6 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-        >
-          Re-run diagnostics
-        </button>
+        <div className="mb-5 flex flex-wrap gap-2">
+          <StatusPill
+            ok={Boolean(data?.isSupabaseConfigured)}
+            label="Supabase env"
+          />
+          <StatusPill
+            ok={Boolean(data?.isMarzbanConfigured)}
+            label="Marzban env"
+          />
+          <StatusPill
+            ok={Boolean(data?.marzban_online)}
+            label="Marzban online"
+          />
+          <StatusPill
+            ok={Boolean(data?.nowpayments_configured)}
+            label="NOWPayments IPN"
+          />
+          <StatusPill
+            ok={Boolean(data?.database_schema_ok)}
+            label="DB schema"
+          />
+          <StatusPill
+            ok={Boolean(data?.orders_telemetry_columns)}
+            label="Telemetry columns"
+          />
+        </div>
+
+        <p className="mb-4 font-mono text-xs text-slate-500">
+          Site: {data?.site_url ?? "—"}
+        </p>
+
+        {data?.database_error ? (
+          <p className="mb-4 text-xs text-amber-400">{data.database_error}</p>
+        ) : null}
+
+        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-300">
+            <Database className="h-4 w-4 text-cyan-400" />
+            Supabase tables
+          </div>
+          <ul className="space-y-2">
+            {(data?.database_tables ?? []).map((row) => (
+              <li
+                key={row.table}
+                className="flex items-center justify-between gap-3 text-xs"
+              >
+                <span className="font-mono text-slate-400">{row.table}</span>
+                {row.ok ? (
+                  <span className="font-bold text-emerald-400">OK</span>
+                ) : (
+                  <span className="max-w-[60%] truncate text-red-400" title={row.error}>
+                    Missing
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {!data?.database_schema_ok ? (
+          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-xs leading-relaxed text-amber-100">
+            <p className="font-bold">Action required in Supabase SQL Editor</p>
+            <p className="mt-2 text-amber-200/90">
+              Run{" "}
+              <code className="rounded bg-slate-950 px-1 py-0.5 font-mono text-cyan-300">
+                supabase/migrations/RUN_ALL_PENDING.sql
+              </code>{" "}
+              from the repo, then click Refresh above.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 flex items-center gap-2 text-xs text-emerald-400">
+            <Server className="h-4 w-4" />
+            Database schema looks ready for production traffic.
+          </div>
+        )}
       </div>
     </div>
   );

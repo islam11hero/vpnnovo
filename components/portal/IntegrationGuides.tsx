@@ -7,9 +7,9 @@ const GUIDES = [
     emoji: "📱",
     title: "Mobile & PC (v2rayNG / V2Box)",
     body: (
-      <p className="text-sm font-medium leading-relaxed text-slate-600">
+      <p className="text-sm font-medium leading-relaxed text-slate-400">
         Copy your Subscription Link above. Open the app and select{" "}
-        <strong className="text-slate-900">
+        <strong className="text-white">
           Update Subscription from Clipboard
         </strong>
         . Connect — your traffic routes through our clean Spanish egress.
@@ -22,17 +22,17 @@ const GUIDES = [
     emoji: "🕵️‍♂️",
     title: "AdsPower / Anti-Detect Browsers",
     body: (
-      <p className="text-sm font-medium leading-relaxed text-slate-600">
+      <p className="text-sm font-medium leading-relaxed text-slate-400">
         We support local SOCKS5 routing. Import your link into{" "}
-        <strong className="text-slate-900">v2rayN</strong> (PC) or{" "}
-        <strong className="text-slate-900">Nekoray</strong>. Enable system proxy.
+        <strong className="text-white">v2rayN</strong> (PC) or{" "}
+        <strong className="text-white">Nekoray</strong>. Enable system proxy.
         In AdsPower, set Proxy to{" "}
-        <strong className="text-slate-900">Socks5</strong>, IP{" "}
-        <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">
+        <strong className="text-white">Socks5</strong>, IP{" "}
+        <code className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-cyan-300">
           127.0.0.1
         </code>
         , Port{" "}
-        <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">
+        <code className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-xs text-cyan-300">
           10808
         </code>
         . This guarantees 0% DNS leaks.
@@ -46,7 +46,7 @@ const GUIDES = [
     title: "Python / Node.js Scrapers",
     body: (
       <div className="space-y-4">
-        <p className="text-sm font-medium leading-relaxed text-slate-600">
+        <p className="text-sm font-medium leading-relaxed text-slate-400">
           Route HTTP clients through the local SOCKS5 tunnel exposed by v2rayN /
           Nekoray after importing your subscription:
         </p>
@@ -74,11 +74,13 @@ type IntegrationGuidesProps = {
 };
 
 export function IntegrationGuides({ embedded = false }: IntegrationGuidesProps) {
+  const isDark = embedded;
+
   return (
     <section
       className={
-        embedded
-          ? "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8"
+        isDark
+          ? "rounded-2xl border border-slate-800 bg-slate-950/60 p-6 md:p-8"
           : "rounded-[1.75rem] border border-slate-200/80 bg-white p-6 shadow-sm md:p-8"
       }
     >
@@ -92,7 +94,7 @@ export function IntegrationGuides({ embedded = false }: IntegrationGuidesProps) 
           </p>
         </>
       ) : (
-        <h3 className="mb-6 font-poppins text-lg font-bold text-slate-900">
+        <h3 className="mb-6 font-poppins text-lg font-bold text-white">
           Integration &amp; Setup Guides
         </h3>
       )}
@@ -102,19 +104,37 @@ export function IntegrationGuides({ embedded = false }: IntegrationGuidesProps) 
           return (
             <details
               key={guide.id}
-              className="group rounded-2xl border border-slate-200 bg-slate-50/50 open:bg-white open:shadow-sm"
+              className={
+                isDark
+                  ? "group rounded-2xl border border-slate-800 bg-slate-900/50 open:border-cyan-500/20 open:bg-slate-900"
+                  : "group rounded-2xl border border-slate-200 bg-slate-50/50 open:bg-white open:shadow-sm"
+              }
             >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-5 py-4 font-bold text-slate-900 transition-colors hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+              <summary
+                className={`flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-5 py-4 font-bold transition-colors [&::-webkit-details-marker]:hidden ${
+                  isDark
+                    ? "text-white hover:bg-slate-800/80"
+                    : "text-slate-900 hover:bg-slate-50"
+                }`}
+              >
                 <span className="flex items-center gap-3 text-sm md:text-base">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#3B82F6]/10 text-lg">
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg ${
+                      isDark ? "border border-slate-700 bg-slate-950" : "bg-[#3B82F6]/10"
+                    }`}
+                  >
                     {guide.emoji}
                   </span>
-                  <Icon className="hidden h-5 w-5 text-[#3B82F6] sm:block" />
+                  <Icon
+                    className={`hidden h-5 w-5 sm:block ${isDark ? "text-cyan-400" : "text-[#3B82F6]"}`}
+                  />
                   {guide.title}
                 </span>
                 <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
               </summary>
-              <div className="border-t border-slate-100 px-5 pb-5 pt-4">
+              <div
+                className={`border-t px-5 pb-5 pt-4 ${isDark ? "border-slate-800" : "border-slate-100"}`}
+              >
                 {guide.body}
               </div>
             </details>

@@ -85,7 +85,7 @@ export function ClientAccessHub({ orderId, subLink, username }: Props) {
           <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">
             {qrValue ? "Mobile QR" : "QR pending"}
           </p>
-          <div className="rounded-2xl border border-slate-700 bg-white p-4">
+          <div className="rounded-2xl border border-slate-600 bg-white p-3 shadow-inner shadow-black/20">
             {qrValue ? (
               <QRCodeSVG value={qrValue} size={200} level="M" includeMargin />
             ) : (

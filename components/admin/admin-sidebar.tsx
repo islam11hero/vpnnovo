@@ -10,14 +10,35 @@ import {
   Radar,
   Settings,
   LogOut,
+  Globe,
+  UserPlus,
+  Headphones,
 } from "lucide-react";
 
 import { ADMIN_ROUTES } from "@/lib/admin-access";
 
 const navItems = [
   { href: ADMIN_ROUTES.overview, label: "Overview", icon: LayoutDashboard, match: "/admin" },
-  { href: ADMIN_ROUTES.clients, label: "Client Control", icon: Users, match: "/admin/clients" },
+  {
+    href: ADMIN_ROUTES.accounts,
+    label: "Registered",
+    icon: UserPlus,
+    match: "/admin/accounts",
+  },
+  { href: ADMIN_ROUTES.clients, label: "VPN Clients", icon: Users, match: "/admin/clients" },
+  {
+    href: ADMIN_ROUTES.support,
+    label: "Support",
+    icon: Headphones,
+    match: "/admin/support",
+  },
   { href: ADMIN_ROUTES.finances, label: "Finances", icon: CreditCard, match: "/admin/finances" },
+  {
+    href: ADMIN_ROUTES.proxies,
+    label: "Proxy Queue",
+    icon: Globe,
+    match: "/admin/proxies",
+  },
   {
     href: ADMIN_ROUTES.monitoring,
     label: "Monitoring",

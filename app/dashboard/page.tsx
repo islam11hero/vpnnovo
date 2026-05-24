@@ -6,6 +6,7 @@ import { DashboardPaymentBanner } from "@/components/dashboard/DashboardPaymentB
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { DashboardTelemetrySection } from "@/components/dashboard/dashboard-telemetry-section";
 import { loadClientDashboardShell } from "@/lib/client-dashboard-loader";
+import { setPortalOrderCookie } from "@/lib/order-access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,10 @@ export default async function DashboardPage() {
   }
 
   const shell = await loadClientDashboardShell(user.id);
+
+  if (shell) {
+    setPortalOrderCookie(shell.order.id);
+  }
 
   if (!shell) {
     return (

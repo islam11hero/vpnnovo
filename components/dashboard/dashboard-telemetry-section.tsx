@@ -26,6 +26,8 @@ export async function DashboardTelemetrySection({ shell }: Props) {
       activeOrders={payload.activeOrders}
       walletBalanceUsd={payload.walletBalanceUsd}
       marzbanUsername={marzbanUsername}
+      proxyOrders={payload.proxyOrders}
+      userId={payload.userId}
     />
   );
 }

@@ -8,6 +8,7 @@ import { isAdminAuthenticated } from "@/lib/require-admin";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
 import { ACTIVE_NODE_STATUSES } from "@/lib/orders";
 import type { SupportTicket, SupportTicketWithOrder } from "@/lib/tickets";
+import { formatTicketDbError } from "@/lib/ticket-db-errors";
 import { isValidUuid } from "@/lib/uuid";
 
 function getDb() {
@@ -71,7 +72,9 @@ export async function createSupportTicket(input: {
     .single();
 
   if (error || !ticket) {
-    return actionErr(error?.message ?? "Failed to create ticket.");
+    return actionErr(
+      formatTicketDbError(error?.message ?? "Failed to create ticket."),
+    );
   }
 
   revalidatePath(`/portal/${order_id}`);
@@ -108,7 +111,7 @@ export async function getTicketsForOrder(
     .order("created_at", { ascending: false });
 
   if (error) {
-    return actionErr(error.message);
+    return actionErr(formatTicketDbError(error.message));
   }
 
   return actionOk({ tickets: (tickets ?? []) as SupportTicket[] });
@@ -164,7 +167,7 @@ export async function getAllSupportTickets(): Promise<
     .order("created_at", { ascending: false });
 
   if (error) {
-    return actionErr(error.message);
+    return actionErr(formatTicketDbError(error.message));
   }
 
   const tickets: SupportTicketWithOrder[] = (data ?? []).map((row) => {
@@ -211,11 +214,17 @@ export async function replyToSupportTicket(input: {
   const db = getDb();
   if (!db.ok) return actionErr(db.error);
 
+  const { data: existing } = await db.client
+    .from("tickets")
+    .select("order_id")
+    .eq("id", ticket_id)
+    .maybeSingle();
+
   const { data: ticket, error } = await db.client
     .from("tickets")
     .update({
       admin_reply,
-      status: "closed",
+      status: "resolved",
       updated_at: new Date().toISOString(),
     })
     .eq("id", ticket_id)
@@ -223,9 +232,44 @@ export async function replyToSupportTicket(input: {
     .single();
 
   if (error || !ticket) {
-    return actionErr(error?.message ?? "Failed to update ticket.");
+    return actionErr(
+      formatTicketDbError(error?.message ?? "Failed to update ticket."),
+    );
   }
 
+  const orderId =
+    typeof existing?.order_id === "string" ? existing.order_id : ticket.order_id;
+
   revalidatePath("/admin");
+  revalidatePath("/admin/support");
+  revalidatePath("/admin/accounts");
+  if (orderId) {
+    revalidatePath(`/portal/${orderId}`);
+  }
+  revalidatePath("/dashboard");
+
   return actionOk({ ticket: ticket as SupportTicket });
+}
+
+export async function getOpenSupportTicketCount(): Promise<
+  ActionResult<{ count: number }>
+> {
+  if (!isAdminAuthenticated()) {
+    return actionErr("Unauthorized");
+  }
+
+  const db = getDb();
+  if (!db.ok) return actionErr(db.error);
+
+  const { count, error } = await db.client
+    .from("tickets")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["open", "pending"])
+    .is("admin_reply", null);
+
+  if (error) {
+    return actionErr(formatTicketDbError(error.message));
+  }
+
+  return actionOk({ count: count ?? 0 });
 }

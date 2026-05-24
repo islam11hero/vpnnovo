@@ -3,9 +3,12 @@ export const ADMIN_LOGIN_PATH = "/admin/login";
 
 export const ADMIN_ROUTES = {
   overview: "/admin",
+  accounts: "/admin/accounts",
   clients: "/admin/clients",
+  support: "/admin/support",
   finances: "/admin/finances",
   monitoring: "/admin/monitoring",
+  proxies: "/admin/proxies",
   settings: "/admin/settings",
   login: ADMIN_LOGIN_PATH,
 } as const;
@@ -13,9 +16,12 @@ export const ADMIN_ROUTES = {
 /** Paths that exist under /app/admin (excludes login). */
 const ADMIN_ALLOWED_PATHS = new Set<string>([
   ADMIN_HOME_PATH,
+  ADMIN_ROUTES.accounts,
   ADMIN_ROUTES.clients,
+  ADMIN_ROUTES.support,
   ADMIN_ROUTES.finances,
   ADMIN_ROUTES.monitoring,
+  ADMIN_ROUTES.proxies,
   ADMIN_ROUTES.settings,
 ]);
 

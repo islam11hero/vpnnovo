@@ -52,6 +52,9 @@ export default function AdminLoginForm() {
           <p className="mt-2 text-sm font-medium text-slate-400">
             Authorized personnel only
           </p>
+          <p className="mt-3 rounded-lg border border-slate-800 bg-slate-950/80 px-3 py-2 font-mono text-[11px] text-slate-500">
+            /admin/login → Command Center
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">

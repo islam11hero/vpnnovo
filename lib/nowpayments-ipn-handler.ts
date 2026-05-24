@@ -13,6 +13,11 @@ import {
   parseVipNowPaymentsOrderId,
 } from "@/lib/nowpayments-order-id";
 import { resolveMarzbanUsername } from "@/lib/orders";
+import {
+  fulfillProxyPaymentOrder,
+  markProxyOrderFailed,
+  orderIsProxyPayment,
+} from "@/lib/proxy-ipn-handler";
 import { updateOrderVpnFields } from "@/lib/order-vpn-update";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SupabaseOrder } from "@/lib/supabase/types";
@@ -164,6 +169,40 @@ export async function processNowPaymentsIpn(
     if (acceptance === "fulfill") {
       return creditWalletTopUp(client, order, paymentCurrency, txHash);
     }
+  }
+
+  if (orderIsProxyPayment(order)) {
+    if (order.status === "paid") {
+      return {
+        status: 200,
+        body: { received: true, message: "Proxy order already paid" },
+      };
+    }
+    if (acceptance === "failed" || acceptance === "underpaid") {
+      await markProxyOrderFailed(client, resolved.dbOrderId);
+      return {
+        status: 200,
+        body: { success: true, message: `Proxy marked ${acceptance}` },
+      };
+    }
+    if (acceptance === "ignored") {
+      return {
+        status: 200,
+        body: { success: true, message: "Ignored payment status" },
+      };
+    }
+    if (acceptance === "fulfill") {
+      return fulfillProxyPaymentOrder(
+        client,
+        order,
+        paymentCurrency,
+        txHash,
+      );
+    }
+    return {
+      status: 200,
+      body: { received: true, message: "Proxy payment pending" },
+    };
   }
 
   if (order.status === "paid" && resolveMarzbanUsername(order)) {

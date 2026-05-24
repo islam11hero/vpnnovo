@@ -18,9 +18,9 @@ export default function HomePage() {
 
         <main>
           <HeroSection />
+          <FreeTrialSection />
           <InfrastructureShowcase />
           <WhyBuySection />
-          <FreeTrialSection />
           <StandardPricing />
           <BusinessBanner />
           <MoneyBackBadge />

@@ -3,15 +3,13 @@
 import { motion } from "framer-motion";
 import { ArrowRight, LineChart } from "lucide-react";
 
-import { ComplianceBanner } from "@/components/marketing/compliance-banner";
-import { NetworkGlobeGraphic } from "@/components/marketing/graphics/NetworkGlobeGraphic";
+import { HeroVaultPreview } from "@/components/marketing/HeroVaultPreview";
 import { AmbientOrbs } from "@/components/marketing/motion/AmbientOrbs";
 import { EASE_SMOOTH } from "@/lib/motion-presets";
 
 export function HeroSection() {
   return (
-    <>
-      <section
+    <section
         className="relative overflow-hidden px-6 pt-28 pb-16 md:pt-36 md:pb-24"
         aria-labelledby="hero-heading"
       >
@@ -99,12 +97,9 @@ export function HeroSection() {
             transition={{ duration: 0.8, delay: 0.2, ease: EASE_SMOOTH }}
             className="mx-auto w-full max-w-md lg:max-w-none"
           >
-            <NetworkGlobeGraphic className="shadow-2xl shadow-cyan-500/10" />
+            <HeroVaultPreview />
           </motion.div>
         </motion.div>
-      </section>
-
-      <ComplianceBanner />
-    </>
+    </section>
   );
 }

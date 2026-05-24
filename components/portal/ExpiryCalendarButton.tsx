@@ -21,7 +21,7 @@ export function ExpiryCalendarButton({ expireUnix, orderId }: Props) {
     <button
       type="button"
       onClick={handleDownload}
-      className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm backdrop-blur-sm transition hover:border-[#3B82F6]/40 hover:text-[#3B82F6]"
+      className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-4 py-2.5 text-sm font-bold text-slate-300 transition hover:border-cyan-500/40 hover:text-cyan-400"
     >
       <CalendarPlus className="h-4 w-4" />
       📅 Add Expiry Alert to Calendar

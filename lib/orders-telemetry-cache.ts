@@ -123,6 +123,7 @@ export async function loadUserPaidOrderWithCache(
     .eq("user_id", userId)
     .eq("status", "paid")
     .neq("plan_name", "Wallet Top-Up")
+    .not("plan_name", "like", "Proxy ·%")
     .order("created_at", { ascending: false })
     .limit(20);
 

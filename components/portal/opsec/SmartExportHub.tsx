@@ -157,7 +157,7 @@ export function SmartExportHub({
           <p className="mb-4 text-xs font-bold tracking-widest text-cyan-500/80 uppercase">
             v2rayNG · Shadowrocket
           </p>
-          <div className="rounded-2xl border border-slate-700 bg-white p-4">
+          <div className="rounded-2xl border border-slate-600 bg-white p-3 shadow-inner shadow-black/20">
             <QRCodeSVG value={preview} size={200} level="M" includeMargin />
           </div>
           <button

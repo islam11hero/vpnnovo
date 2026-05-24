@@ -11,7 +11,6 @@ import { fadeUp, staggerContainer } from "@/lib/motion-presets";
 
 const PILLARS = [
   {
-    emoji: "🔒",
     icon: Lock,
     title: "Protect your privacy",
     description:
@@ -19,7 +18,6 @@ const PILLARS = [
     accent: "from-cyan-500/10 to-transparent",
   },
   {
-    emoji: "🛡️",
     icon: Eye,
     title: "Stay safe online",
     description:
@@ -27,7 +25,6 @@ const PILLARS = [
     accent: "from-emerald-500/10 to-transparent",
   },
   {
-    emoji: "🌍",
     icon: Globe,
     title: "Access content anywhere",
     description:
@@ -94,13 +91,10 @@ export function WhyBuySection() {
                 aria-hidden
               />
               <motion.div
-                className="relative mb-4 flex items-center gap-3"
+                className="relative mb-4"
                 whileHover={{ x: 4 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
-                <span className="text-2xl" aria-hidden>
-                  {item.emoji}
-                </span>
                 <motion.div
                   className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/10"
                   animate={{ boxShadow: ["0 0 0 0 rgba(6,182,212,0)", "0 0 20px 2px rgba(6,182,212,0.2)", "0 0 0 0 rgba(6,182,212,0)"] }}

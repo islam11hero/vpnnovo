@@ -7,11 +7,11 @@ import {
   CheckCircle2,
   Code2,
   CreditCard,
+  FlaskConical,
+  Globe,
   HardDrive,
   Headphones,
   KeyRound,
-  Shield,
-  ShieldCheck,
 } from "lucide-react";
 
 import { ClientAccessHub } from "@/components/portal/ClientAccessHub";
@@ -32,16 +32,19 @@ import { WebRTCLeakShield } from "@/components/portal/opsec/WebRTCLeakShield";
 import { ZeroTraceWipeButton } from "@/components/portal/opsec/ZeroTraceWipeButton";
 import { TelemetryDelayedBadge } from "@/components/admin/clients/telemetry-delayed-badge";
 import { FinancialHub } from "@/components/dashboard/FinancialHub";
+import { ProxyServicesHub } from "@/components/dashboard/ProxyServicesHub";
 import type { AdsPowerProxyResult } from "@/lib/marzban-proxy-extract";
 import type { ClientMarzbanTelemetry } from "@/lib/marzban-types";
 import { formatBytes, formatMarzbanStatus, usagePercent } from "@/lib/formatters";
 import { formatPortalCurrency, formatPortalExpiry } from "@/lib/portal-format";
 import type { PortalOrderOption } from "@/lib/orders";
 import type { SupabaseOrder } from "@/lib/supabase/types";
+import type { ProxyOrderRow } from "@/lib/supabase/proxy-types";
 
 type TabId =
   | "overview"
   | "connection"
+  | "proxies"
   | "developer"
   | "billing"
   | "support"
@@ -58,19 +61,23 @@ export type OpsecVaultProps = {
   adsPowerProxy: AdsPowerProxyResult;
   walletBalanceUsd?: number;
   showFinancialHub?: boolean;
+  proxyOrders?: ProxyOrderRow[];
+  userId?: string | null;
 };
 
 const TABS: {
   id: TabId;
   label: string;
+  shortLabel: string;
   icon: typeof BarChart3;
 }[] = [
-  { id: "overview", label: "OPSEC Vault", icon: Shield },
-  { id: "connection", label: "Connection", icon: KeyRound },
-  { id: "developer", label: "Developer Hub", icon: Code2 },
-  { id: "billing", label: "Billing & Security", icon: ShieldCheck },
-  { id: "support", label: "Support & Help", icon: Headphones },
-  { id: "security", label: "Security Lab", icon: Shield },
+  { id: "overview", label: "OPSEC Vault", shortLabel: "Vault", icon: BarChart3 },
+  { id: "connection", label: "Connection", shortLabel: "Connect", icon: KeyRound },
+  { id: "proxies", label: "Proxy IPs", shortLabel: "Proxy", icon: Globe },
+  { id: "developer", label: "Developer Hub", shortLabel: "Dev", icon: Code2 },
+  { id: "billing", label: "Billing", shortLabel: "Billing", icon: CreditCard },
+  { id: "support", label: "Support", shortLabel: "Help", icon: Headphones },
+  { id: "security", label: "Security Lab", shortLabel: "Security", icon: FlaskConical },
 ];
 
 function NavButton({
@@ -92,14 +99,22 @@ function NavButton({
       <button
         type="button"
         onClick={() => onSelect(tab.id)}
-        className={`flex flex-1 flex-col items-center gap-1 px-1 py-2 transition-colors ${
+        className={`flex w-[4.25rem] shrink-0 flex-col items-center gap-1 px-2 py-2 transition-colors ${
           isActive ? "text-cyan-400" : "text-slate-500"
         }`}
         aria-current={isActive ? "page" : undefined}
       >
-        <Icon className={`h-5 w-5 ${isActive ? "scale-110" : ""}`} />
-        <span className="max-w-[4.5rem] truncate text-[10px] font-bold leading-tight">
-          {tab.label.split(" ")[0]}
+        <span
+          className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors ${
+            isActive
+              ? "bg-cyan-500/15 text-cyan-400"
+              : "bg-transparent text-inherit"
+          }`}
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+        <span className="max-w-full truncate text-[10px] font-bold leading-tight">
+          {tab.shortLabel}
         </span>
       </button>
     );
@@ -133,6 +148,8 @@ export function OpsecVault({
   adsPowerProxy,
   walletBalanceUsd = 0,
   showFinancialHub = true,
+  proxyOrders = [],
+  userId = null,
 }: OpsecVaultProps) {
   const [activeTab, setActiveTab] = useState<TabId>(
     showFinancialHub ? "overview" : "connection",
@@ -162,9 +179,10 @@ export function OpsecVault({
   const isActive = statusLabel === "Active";
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col lg:flex-row">
+    <div className="mx-auto min-h-[calc(100vh-8rem)] max-w-6xl overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 shadow-2xl shadow-black/30">
+      <div className="flex min-h-[calc(100vh-8rem)] flex-col lg:flex-row">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r border-slate-800 bg-slate-950/90 px-4 py-8 lg:block lg:rounded-l-2xl lg:border lg:border-r-0">
+      <aside className="hidden w-64 shrink-0 border-r border-slate-800 bg-slate-950/90 px-4 py-8 lg:block">
         <div className="mb-8 px-2">
           <p className="text-xs font-bold tracking-[0.2em] text-cyan-500/80 uppercase">
             OPSEC Security Vault
@@ -190,9 +208,9 @@ export function OpsecVault({
       </aside>
 
       {/* Main content */}
-      <div className="flex min-w-0 flex-1 flex-col bg-slate-950 lg:rounded-r-2xl lg:border lg:border-l-0 lg:border-slate-800">
+      <div className="flex min-w-0 flex-1 flex-col bg-slate-950">
         {/* Mobile header */}
-        <div className="border-b border-slate-800 bg-slate-950/95 px-5 py-5 lg:hidden">
+        <div className="border-b border-slate-800 bg-slate-950/95 px-5 py-4 lg:hidden">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-bold tracking-[0.2em] text-cyan-500 uppercase">
@@ -214,7 +232,7 @@ export function OpsecVault({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 pb-28 lg:p-8 lg:pb-8">
+        <div className="flex-1 overflow-y-auto p-5 pb-24 lg:p-8 lg:pb-8">
           {/* Desktop tab title */}
           <div className="mb-6 hidden lg:block">
             <h2 className="font-poppins text-2xl font-bold text-white">
@@ -356,6 +374,14 @@ export function OpsecVault({
             </div>
           )}
 
+          {activeTab === "proxies" && (
+            <ProxyServicesHub
+              initialOrders={proxyOrders}
+              userId={userId}
+              vaultOrderId={order.id}
+            />
+          )}
+
           {activeTab === "developer" && (
             <div className="space-y-6">
               <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-6 backdrop-blur-md">
@@ -469,21 +495,24 @@ export function OpsecVault({
           )}
         </div>
 
-        {/* Mobile bottom nav */}
+        {/* Mobile bottom nav — horizontal scroll */}
         <nav
-          className="fixed bottom-0 left-0 right-0 z-40 flex border-t border-slate-800 bg-slate-950/95 px-2 py-1 backdrop-blur-lg lg:hidden"
+          className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-800 bg-slate-950/98 backdrop-blur-xl lg:hidden"
           aria-label="Dashboard navigation"
         >
-          {TABS.map((tab) => (
-            <NavButton
-              key={tab.id}
-              tab={tab}
-              activeTab={activeTab}
-              onSelect={setActiveTab}
-              layout="bottom"
-            />
-          ))}
+          <div className="mx-auto flex max-w-6xl overflow-x-auto overscroll-x-contain px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {TABS.map((tab) => (
+              <NavButton
+                key={tab.id}
+                tab={tab}
+                activeTab={activeTab}
+                onSelect={setActiveTab}
+                layout="bottom"
+              />
+            ))}
+          </div>
         </nav>
+      </div>
       </div>
     </div>
   );

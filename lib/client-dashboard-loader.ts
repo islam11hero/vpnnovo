@@ -10,7 +10,9 @@ import {
   orderToCachedUsername,
   readCachedTelemetry,
 } from "@/lib/orders-telemetry-cache";
+import type { ProxyOrderRow } from "@/lib/supabase/proxy-types";
 import type { SupabaseOrder } from "@/lib/supabase/types";
+import { loadProxyOrdersForClient } from "@/lib/proxy-orders-loader";
 
 export type ClientDashboardShell = {
   order: SupabaseOrder;
@@ -26,6 +28,8 @@ export type ClientDashboardPayload = ClientDashboardShell & {
   adsPowerProxy: AdsPowerProxyResult;
   activeOrders: Awaited<ReturnType<typeof loadPortalActiveOrders>>;
   walletBalanceUsd: number;
+  proxyOrders: ProxyOrderRow[];
+  userId: string | null;
 };
 
 /** Fast path — Supabase only (for Suspense shell). */
@@ -91,6 +95,12 @@ export async function loadClientDashboardTelemetry(
     vpnUsername: marzbanUsername,
   });
 
+  const userId = order.user_id?.trim() || null;
+  const proxyOrders = await loadProxyOrdersForClient({
+    userId,
+    vaultOrderId: order.id,
+  });
+
   return {
     order,
     marzbanUsername,
@@ -102,6 +112,8 @@ export async function loadClientDashboardTelemetry(
     adsPowerProxy,
     activeOrders,
     walletBalanceUsd: Number(order.wallet_balance_usd) || 0,
+    proxyOrders,
+    userId,
   };
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { assertOrderAccess } from "@/lib/order-access";
+import { formatTicketDbError } from "@/lib/ticket-db-errors";
 import { isValidUuid } from "@/lib/uuid";
 import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return jsonError(error.message, 500);
+    return jsonError(formatTicketDbError(error.message), 500);
   }
 
   return NextResponse.json({ success: true, tickets: tickets ?? [] });
@@ -122,7 +123,10 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !ticket) {
-    return jsonError(error?.message ?? "Failed to create ticket", 500);
+    return jsonError(
+      formatTicketDbError(error?.message ?? "Failed to create ticket"),
+      500,
+    );
   }
 
   return NextResponse.json({ success: true, ticket });

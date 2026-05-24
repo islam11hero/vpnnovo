@@ -22,6 +22,7 @@ import { SupportInbox } from "@/components/admin/SupportInbox";
 import { ConfirmDestructiveDialog } from "@/components/admin/noc/confirm-destructive-dialog";
 import { useNocRefresh } from "@/components/admin/noc/noc-refresh-context";
 import type { NocCrmAction } from "@/components/admin/noc/noc-crm-table";
+import { AdminQuickNav } from "@/components/admin/AdminQuickNav";
 import { InfrastructureOpsCard } from "@/components/admin/noc/infrastructure-ops-card";
 import {
   ChartWidget,
@@ -162,6 +163,7 @@ export function AdminDashboardClient() {
 
       {activeTab === "overview" && (
         <div className="space-y-6">
+          <AdminQuickNav />
           <FinancialWidget />
           <FleetWidget onNukeClick={() => setNukeOpen(true)} />
           <ChartWidget />

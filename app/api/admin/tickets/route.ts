@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { SupportTicketWithOrder } from "@/lib/tickets";
+import { formatTicketDbError } from "@/lib/ticket-db-errors";
 import { isAdminAuthenticated, unauthorizedAdminResponse } from "@/lib/require-admin";
 import { requireSupabaseAdmin } from "@/lib/supabase/route-handler";
 
@@ -59,7 +60,7 @@ export async function GET() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return jsonError(error.message, 500);
+    return jsonError(formatTicketDbError(error.message), 500);
   }
 
   const tickets: SupportTicketWithOrder[] = (data ?? []).map((row) => {
@@ -121,7 +122,7 @@ export async function PATCH(request: Request) {
     "status" in body &&
     typeof (body as { status: unknown }).status === "string"
       ? (body as { status: string }).status
-      : "closed";
+      : "resolved";
 
   if (!ticket_id) {
     return jsonError("Invalid or missing ticket_id", 400);
@@ -143,7 +144,10 @@ export async function PATCH(request: Request) {
     .single();
 
   if (error || !ticket) {
-    return jsonError(error?.message ?? "Failed to update ticket", 500);
+    return jsonError(
+      formatTicketDbError(error?.message ?? "Failed to update ticket"),
+      500,
+    );
   }
 
   return NextResponse.json({ success: true, ticket });
