@@ -140,3 +140,28 @@ export async function fetchAllMarzbanUsers(): Promise<
 
   return { ok: true, users, byUsername };
 }
+
+/** Single-user fetch when bulk list misses a username (pagination / sync lag). */
+export async function fetchMarzbanUserByUsername(
+  username: string,
+): Promise<
+  | { ok: true; user: MarzbanUserRecord }
+  | { ok: false; error: string }
+> {
+  const trimmed = username.trim();
+  if (!trimmed) {
+    return { ok: false, error: "Missing username" };
+  }
+
+  const res = await marzbanFetchJson<Record<string, unknown>>(
+    `/api/user/${encodeURIComponent(trimmed)}`,
+  );
+
+  if (!res.success) {
+    return { ok: false, error: res.error };
+  }
+
+  const user = parseUser(res.data);
+  await syncOrderTelemetryCache(user.username, toCachedTelemetry(user));
+  return { ok: true, user };
+}

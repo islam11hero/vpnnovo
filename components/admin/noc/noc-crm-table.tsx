@@ -91,6 +91,8 @@ export function NocCrmTable({
                 const highUsage = pct >= 90 && limit > 0;
                 const rowBusy =
                   processingKey?.startsWith(`${node.orderId}:`) ?? false;
+                const torrentBusy = processingKey === `${node.orderId}:toggle_torrent`;
+                const adsBusy = processingKey === `${node.orderId}:toggle_ads`;
                 const menuOpen = openMenuId === node.orderId;
                 const revoked = node.orderStatus === "revoked";
 
@@ -153,7 +155,8 @@ export function NocCrmTable({
                         <RoutingSwitch
                           label="Block Torrent (P2P)"
                           checked={node.blockTorrent}
-                          disabled={revoked}
+                          disabled={revoked || rowBusy}
+                          busy={torrentBusy}
                           onChange={() =>
                             onAction(node.orderId, "toggle_torrent")
                           }
@@ -161,7 +164,8 @@ export function NocCrmTable({
                         <RoutingSwitch
                           label="Block Ads"
                           checked={node.blockAds}
-                          disabled={revoked}
+                          disabled={revoked || rowBusy}
+                          busy={adsBusy}
                           onChange={() => onAction(node.orderId, "toggle_ads")}
                         />
                       </div>
@@ -280,11 +284,13 @@ function RoutingSwitch({
   label,
   checked,
   disabled,
+  busy,
   onChange,
 }: {
   label: string;
   checked: boolean;
   disabled: boolean;
+  busy?: boolean;
   onChange: () => void;
 }) {
   return (
@@ -293,17 +299,21 @@ function RoutingSwitch({
         type="button"
         role="switch"
         aria-checked={checked}
-        disabled={disabled}
+        disabled={disabled || busy}
         onClick={onChange}
         className={`relative h-4 w-8 shrink-0 rounded-full transition ${
           checked ? "bg-cyan-600" : "bg-slate-700"
         } disabled:opacity-40`}
       >
-        <span
-          className={`absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white transition ${
-            checked ? "translate-x-4" : ""
-          }`}
-        />
+        {busy ? (
+          <Loader2 className="absolute inset-0 m-auto h-3 w-3 animate-spin text-white" />
+        ) : (
+          <span
+            className={`absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white transition ${
+              checked ? "translate-x-4" : ""
+            }`}
+          />
+        )}
       </button>
       {label}
     </label>

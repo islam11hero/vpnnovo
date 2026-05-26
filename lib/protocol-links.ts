@@ -19,8 +19,15 @@ export function buildXhttpSubscriptionUrl(baseUrl: string): string {
   return appendQueryParam(baseUrl, "core", "xhttp");
 }
 
-export function buildSingboxProfileUrl(baseUrl: string): string {
-  return appendQueryParam(buildXhttpSubscriptionUrl(baseUrl), "fps", "sing-box");
+export function buildSingboxProfileUrl(
+  baseUrl: string,
+  node?: string | null,
+): string {
+  let url = appendQueryParam(buildXhttpSubscriptionUrl(baseUrl), "fps", "sing-box");
+  if (node?.trim()) {
+    url = appendQueryParam(url, "node", node.trim());
+  }
+  return url;
 }
 
 export function buildClashMetaProfileUrl(baseUrl: string): string {

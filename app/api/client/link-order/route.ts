@@ -1,27 +1,26 @@
 import { NextResponse } from "next/server";
 
+import { corsPreflight, withCors } from "@/lib/api/cors";
 import { jsonError } from "@/lib/api/json-error";
+import { resolveClientVpnUser } from "@/lib/client-vpn-auth";
 import { linkPaidOrderToUser } from "@/lib/link-order";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
 
 export async function POST(request: Request) {
-  const supabase = createSupabaseServerClient();
-  if (!supabase) {
-    return jsonError("Authentication service unavailable", 503);
+  const auth = await resolveClientVpnUser(request);
+  if (!auth.ok) {
+    return withCors(request, jsonError(auth.error, auth.status));
   }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return jsonError("Unauthorized", 401);
-  }
+  const user = auth.user;
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return jsonError("Invalid JSON", 400);
+    return withCors(request, jsonError("Invalid JSON", 400));
   }
 
   const orderId =
@@ -34,8 +33,11 @@ export async function POST(request: Request) {
 
   const result = await linkPaidOrderToUser(orderId, user.id);
   if (!result.ok) {
-    return jsonError(result.error, result.status);
+    return withCors(request, jsonError(result.error, result.status));
   }
 
-  return NextResponse.json({ success: true, orderId: result.orderId });
+  return withCors(
+    request,
+    NextResponse.json({ success: true, orderId: result.orderId }),
+  );
 }

@@ -15,6 +15,7 @@ import {
   enforceSessionLimitOrderNode,
   instantRevokeOrderNode,
   resetOrderUsage,
+  toggleOrderRoutingFlag,
 } from "@/actions/admin-orders";
 import { useAdminSearch } from "@/components/admin/admin-search-context";
 import { CreateVipDialog } from "@/components/admin/CreateVipDialog";
@@ -97,11 +98,32 @@ export function AdminDashboardClient() {
     [refreshTelemetry],
   );
 
+  const handleRoutingToggle = (orderId: string, flag: "torrent" | "ads") => {
+    const key = `${orderId}:toggle_${flag}`;
+    if (processingKey) return;
+    setProcessingKey(key);
+
+    startTransition(async () => {
+      const result = await toggleOrderRoutingFlag(orderId, flag);
+      if (!result.success) {
+        toast.error("Routing update failed", { description: result.error });
+      } else {
+        toast.success(result.data?.message ?? "Routing updated", {
+          description: "Saved on Marzban user note — reconnect client to apply.",
+        });
+      }
+      await refreshTelemetry();
+      setProcessingKey(null);
+    });
+  };
+
   const handleAction = (orderId: string, action: NocCrmAction) => {
-    if (action === "toggle_torrent" || action === "toggle_ads") {
-      toast.message("Routing preference saved", {
-        description: "Xray core push — pending backend integration.",
-      });
+    if (action === "toggle_torrent") {
+      handleRoutingToggle(orderId, "torrent");
+      return;
+    }
+    if (action === "toggle_ads") {
+      handleRoutingToggle(orderId, "ads");
       return;
     }
     if (processingKey) return;

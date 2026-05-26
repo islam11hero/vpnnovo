@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
 
@@ -13,8 +14,17 @@ export function MoneyBackBadge() {
           <motion.div
             whileHover={{ scale: 1.01 }}
             transition={{ type: "spring", stiffness: 300, damping: 24 }}
-            className="flex flex-col items-center gap-6 rounded-2xl border border-emerald-500/25 bg-emerald-950/20 px-8 py-10 text-center md:flex-row md:text-left"
+            className="flex flex-col items-center gap-6 overflow-hidden rounded-2xl border border-emerald-500/25 bg-emerald-950/20 px-8 py-10 text-center md:flex-row md:text-left"
           >
+            <div className="relative hidden h-32 w-48 shrink-0 overflow-hidden rounded-xl border border-emerald-500/20 md:block lg:h-36 lg:w-56">
+              <Image
+                src="/marketing/marketing-crypto-trust.png"
+                alt="Instant crypto activation and 30-day guarantee"
+                fill
+                sizes="224px"
+                className="object-cover"
+              />
+            </div>
             <motion.div
               className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10"
               animate={{

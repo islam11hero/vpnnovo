@@ -71,6 +71,45 @@ export async function fetchMarzbanUserTelemetry(
   }
 }
 
+/** Update Marzban user note (routing flags, admin markers). */
+export async function updateMarzbanUserNote(
+  username: string,
+  note: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmed = username.trim();
+  if (!trimmed) {
+    return { ok: false, error: "Missing Marzban username" };
+  }
+
+  try {
+    const res = await marzbanFetchOrThrow(
+      `/api/user/${encodeURIComponent(trimmed)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: note || "" }),
+      },
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return {
+        ok: false,
+        error: errText.slice(0, 200) || `Marzban HTTP ${res.status}`,
+      };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof MarzbanError) {
+      return { ok: false, error: error.message };
+    }
+    const message =
+      error instanceof Error ? error.message : "Marzban update failed";
+    return { ok: false, error: message };
+  }
+}
+
 /** Portal-safe fetch — returns null when Marzban is unreachable. */
 export async function fetchMarzbanUserStats(
   username: string,

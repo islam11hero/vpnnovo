@@ -8,10 +8,12 @@ import { ChevronDown, Menu, Shield, X } from "lucide-react";
 import { DEPLOYMENT_PLATFORMS } from "@/components/marketing/os-icons";
 
 const NAV_LINKS = [
-  { href: "#why-buy", label: "Why IPNOVA" },
-  { href: "#free-trial", label: "Free Trial" },
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#use-cases", label: "Use cases" },
+  { href: "#free-trial", label: "Free trial" },
   { href: "#pricing", label: "Pricing" },
-  { href: "/pricing?tab=b2b", label: "B2B Proxies" },
+  { href: "#proxies", label: "Proxies" },
+  { href: "#faq", label: "FAQ" },
 ] as const;
 
 export function MarketingHeader() {

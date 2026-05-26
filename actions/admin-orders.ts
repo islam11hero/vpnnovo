@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 
 import { actionErr, actionOk, type ActionResult } from "@/lib/actions-result";
 import { executeMarzbanAdminAction, MarzbanError } from "@/lib/marzban";
+import { fetchMarzbanUserTelemetry, updateMarzbanUserNote } from "@/lib/marzban/api";
 import { marzbanFetchOrThrow } from "@/lib/marzban-client";
+import { buildRoutingNote, routingFlagsFromNote, toggleRoutingFlag } from "@/lib/marzban-routing-note";
 import { resolveMarzbanUsername } from "@/lib/orders";
 import { isAdminAuthenticated } from "@/lib/require-admin";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
@@ -252,6 +254,57 @@ export async function revokeOrderNode(
   return actionOk();
 }
 
+export async function toggleOrderRoutingFlag(
+  orderId: string,
+  flag: "torrent" | "ads",
+): Promise<
+  ActionResult<{ blockTorrent: boolean; blockAds: boolean; message: string }>
+> {
+  const denied = requireAdmin();
+  if (denied) return denied;
+
+  const loaded = await getOrderForAdmin(orderId);
+  if (!loaded.ok) return actionErr(loaded.error);
+
+  const username = resolveMarzbanUsername(loaded.order);
+  if (!username) {
+    return actionErr("No Marzban user linked to this order.");
+  }
+
+  if (loaded.order.status === "revoked") {
+    return actionErr("Cannot change routing on a revoked order.");
+  }
+
+  const telemetry = await fetchMarzbanUserTelemetry(username);
+  if (!telemetry.ok) {
+    return actionErr(telemetry.error);
+  }
+
+  const { flags, note } = toggleRoutingFlag(telemetry.data.note, flag);
+  const updated = await updateMarzbanUserNote(username, note);
+  if (!updated.ok) {
+    return actionErr(updated.error);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/clients");
+
+  const label =
+    flag === "torrent"
+      ? flags.blockTorrent
+        ? "P2P/torrent block enabled"
+        : "P2P/torrent block disabled"
+      : flags.blockAds
+        ? "Ad block tag enabled"
+        : "Ad block tag disabled";
+
+  return actionOk({
+    blockTorrent: flags.blockTorrent,
+    blockAds: flags.blockAds,
+    message: label,
+  });
+}
+
 /** Apply 10Mbps throttle marker on Marzban user (note + status preserved). */
 export async function throttleOrderNode(orderId: string): Promise<ActionResult> {
   const denied = requireAdmin();
@@ -270,13 +323,18 @@ export async function throttleOrderNode(orderId: string): Promise<ActionResult> 
   }
 
   try {
+    const telemetry = await fetchMarzbanUserTelemetry(username);
+    const existingNote = telemetry.ok ? telemetry.data.note : null;
+    const flags = routingFlagsFromNote(existingNote);
+    const note = buildRoutingNote(
+      `THROTTLED · 10Mbps cap (admin)`,
+      flags,
+    );
     const encoded = encodeURIComponent(username);
     const putRes = await marzbanFetchOrThrow(`/api/user/${encoded}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        note: "THROTTLED · 10Mbps cap (admin)",
-      }),
+      body: JSON.stringify({ note }),
     });
     if (!putRes.ok) {
       const errText = await putRes.text();

@@ -1,29 +1,21 @@
 import "server-only";
 
 import type { AdminNodeRow, AdminNodesPayload } from "@/lib/admin-nodes";
+import { routingFlagsFromNote } from "@/lib/marzban-routing-note";
 import {
   fetchAllMarzbanUsers,
+  fetchMarzbanUserByUsername,
   protocolLabelFromProxies,
   sessionStatusLabel,
   type MarzbanUserRecord,
 } from "@/lib/marzban/users-bulk";
 import { resolveMarzbanUsername } from "@/lib/orders";
+import { readCachedTelemetry } from "@/lib/orders-telemetry-cache";
 import { getSupabaseAdminResult } from "@/lib/supabase/admin";
 import type { SupabaseOrder } from "@/lib/supabase/types";
 
 const ORDER_SELECT =
-  "id, plan_name, status, vpn_username, marzban_username, user_id, created_at";
-
-function routingFlagsFromNote(note: string | null): {
-  blockTorrent: boolean;
-  blockAds: boolean;
-} {
-  const n = (note ?? "").toLowerCase();
-  return {
-    blockTorrent: n.includes("block_torrent") || n.includes("no_p2p"),
-    blockAds: n.includes("block_ads") || n.includes("no_ads"),
-  };
-}
+  "id, plan_name, status, vpn_username, marzban_username, user_id, created_at, used_traffic, data_limit, marzban_status";
 
 function mergeMarzbanRow(
   order: SupabaseOrder,
@@ -34,20 +26,32 @@ function mergeMarzbanRow(
   const flags = routingFlagsFromNote(marzban?.note ?? null);
 
   if (!marzban) {
+    const cache = readCachedTelemetry(order);
+    const hasCache =
+      cache.usedTraffic > 0 ||
+      cache.dataLimit > 0 ||
+      (cache.marzbanStatus && cache.marzbanStatus !== "unknown");
+
     return {
       orderId: order.id,
       planName: order.plan_name,
       orderStatus: order.status,
       marzbanUsername,
-      usedTraffic: 0,
-      dataLimit: 0,
-      marzbanStatus: order.status === "revoked" ? "revoked" : "unknown",
+      usedTraffic: hasCache ? cache.usedTraffic : 0,
+      dataLimit: hasCache ? cache.dataLimit : 0,
+      marzbanStatus: order.status === "revoked" ? "revoked" : cache.marzbanStatus,
       expire: null,
       note: null,
       telemetryLive: false,
       createdAt: order.created_at,
-      liveProtocol: "—",
-      sessionStatus: order.status === "revoked" ? "Revoked" : "No Telemetry",
+      liveProtocol: marzbanUsername ? "VLESS" : "—",
+      sessionStatus: order.status === "revoked"
+        ? "Revoked"
+        : hasCache
+          ? sessionStatusLabel(cache.marzbanStatus, null)
+          : marzbanUsername
+            ? "Sync pending"
+            : "No Marzban user",
       onlinesLimit: null,
       blockTorrent: flags.blockTorrent,
       blockAds: flags.blockAds,
@@ -98,18 +102,26 @@ export async function loadAdminNodes(): Promise<
   const byUsername = marzbanResult.ok ? marzbanResult.byUsername : new Map();
   const telemetryUnreachable = !marzbanResult.ok;
 
-  const nodes: AdminNodeRow[] = rows.map((order) => {
-    const username = resolveMarzbanUsername(order);
-    const marzban =
-      username && order.status !== "revoked"
-        ? byUsername.get(username)
-        : undefined;
-    return mergeMarzbanRow(
-      order,
-      marzban,
-      Boolean(marzban && marzbanResult.ok),
-    );
-  });
+  const nodes: AdminNodeRow[] = await Promise.all(
+    rows.map(async (order) => {
+      const username = resolveMarzbanUsername(order);
+      let marzban =
+        username && order.status !== "revoked"
+          ? byUsername.get(username)
+          : undefined;
+      let telemetryLive = Boolean(marzban && marzbanResult.ok);
+
+      if (!marzban && username && order.status !== "revoked") {
+        const live = await fetchMarzbanUserByUsername(username);
+        if (live.ok) {
+          marzban = live.user;
+          telemetryLive = true;
+        }
+      }
+
+      return mergeMarzbanRow(order, marzban, telemetryLive);
+    }),
+  );
 
   return {
     ok: true,
